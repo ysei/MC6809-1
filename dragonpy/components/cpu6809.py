@@ -340,7 +340,6 @@ class CPU(object):
             last_cpu_cycles = self.cycles
 
             self.burst_run()
-            self.call_sync_callbacks()
 
 #             log.critical("Run %i", burst_op_count)
 
