@@ -38,10 +38,8 @@ import threading
 import time
 import warnings
 
-from dragonlib.utils import lib2and3
-import logging
-
-log=logging.getLogger(__name__)
+from dragonlib.utils import six
+from dragonlib.utils.logging_utils import log
 from dragonpy.MC6809data.MC6809_data_raw2 import (
     OP_DATA, REG_A, REG_B, REG_CC, REG_D, REG_DP, REG_PC,
     REG_S, REG_U, REG_X, REG_Y
