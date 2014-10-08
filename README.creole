@@ -35,7 +35,100 @@ Example with "U" is hold down:
 
 = donation
 
-* Send [[http://www.bitcoin.org/|Bitcoins]] to [[https://blockexplorer.com/address/1823RZ5Md1Q2X5aSXRC5LRPcYdveCiVX6F|1823RZ5Md1Q2X5aSXRC5LRPcYdveCiVX6F]]
+
+== Links
+
+ * Grant Searle's Multicomp FPGA project:
+ ** Homepage: http://searle.hostei.com/grant/Multicomp/
+ ** own [[https://github.com/jedie/DragonPy/tree/master/dragonpy/Multicomp6809#readme|dragonpy/Multicomp6809/README]]
+ * Lennart Benschop 6809 Single Board Computer:
+ ** Homepage: http://lennartb.home.xs4all.nl/m6809.html
+ ** own [[https://github.com/jedie/DragonPy/tree/master/dragonpy/sbc09#readme|dragonpy/sbc09/README]]
+ * Grant Searle's Simple 6809 design:
+ ** Homepage: http://searle.hostei.com/grant/6809/Simple6809.html
+ ** own [[https://github.com/jedie/DragonPy/tree/master/dragonpy/Simple6809#readme|dragonpy/Simple6809/README]]
+
+Some links:
+
+ * http://www.burgins.com/m6809.html
+ * http://www.maddes.net/m6809pm/ - Programming Manual for the 6809 microprocessor from Motorola Inc. (now Freescale)
+ * http://www.6809.org.uk/dragon/hardware.shtml
+ * http://dragondata.worldofdragon.org/Publications/inside-dragon.htm
+ * http://koti.mbnet.fi/~atjs/mc6809/ - 6809 Emulation Page
+
+Source codes:
+ * https://github.com/naughton/mc6809/blob/master/mc6809.ts
+ * https://github.com/maly/6809js/blob/master/6809.js
+ * http://mamedev.org/source/src/mess/drivers/dragon.c.html
+ * http://mamedev.org/source/src/mess/machine/dragon.c.html
+ * http://mamedev.org/source/src/emu/cpu/m6809/m6809.c.html
+ * https://github.com/kjetilhoem/hatchling-32/blob/master/hatchling-32/src/no/k/m6809/InstructionSet.scala
+
+Dragon 32 resources:
+
+ * Forum: http://archive.worldofdragon.org/phpBB3/index.php
+ * Wiki: http://archive.worldofdragon.org/index.php?title=Main_Page
+
+
+== Credits
+
+Some code based on:
+
+**ApplePy**
+
+An Apple ][ emulator in Python
+ * Author: James Tauber
+ * https://github.com/jtauber/applepy
+ * License: MIT 
+
+
+**XRoar**
+A really cool Dragon / CoCo emulator
+ * Author: Ciaran Anscomb
+ * http://www.6809.org.uk/xroar/
+ * License: GNU GPL v2
+
+=== included Python modules:
+
+**python-pager**
+Page output and find dimensions of console.
+ * Author: Anatoly Techtonik
+ * License: Public Domain
+ * Homepage: https://bitbucket.org/techtonik/python-pager/
+ * Stored here: [[https://github.com/jedie/DragonPy/blob/master/dragonpy/utils/pager.py|/dragonpy/utils/pager.py]]
+
+**srecutils.py**
+Motorola S-Record utilities
+ * Author: Gabriel Tremblay
+ * License: GNU GPL v2 
+ * Homepage: https://github.com/gabtremblay/pysrec
+ * Stored here: [[https://github.com/jedie/DragonPy/blob/master/dragonpy/utils/srecord_utils.py|/dragonpy/utils/srecord_utils.py]]
+
+**six**
+Six is a Python 2 and 3 compatibility library.
+ * https://pypi.python.org/pypi/six
+ * https://bitbucket.org/gutworth/six
+
+== History
+
+* 08.10.2014 - Release as v0.3.1
+* 29.09.2014 - Merge [[https://github.com/jedie/PyDragon32|PyDragon32]] project
+* 25.09.2014 - Release v0.3.0:
+** [[https://github.com/jedie/DragonPy/commit/f396551df730b509498d1b884cdda8f7075737c4|Change Display Queue to a simple Callback]]
+** Reimplement [[https://github.com/jedie/DragonPy/commit/f3bfbdb2ae9906d8e051436173225c3fa8de1373|Multicomp 6809]] and [[https://github.com/jedie/DragonPy/commit/61c26911379d2b7ea6d07a8b479ab14c5d5a7154|SBC09]]
+** Many code refactoring and cleanup
+* 14.09.2014 - Release v0.2.0 - Add a speedlimit, config dialog and IRQ: [[http://archive.worldofdragon.org/phpBB3/viewtopic.php?f=5&t=4308&p=11780#p11780|Forum post 11780]] 
+* 05.09.2014 - Release v0.1.0 - Implement pause/resume, hard-/soft-reset 6809 in GUI and improve a little the GUI/Editor stuff: [[https://github.com/jedie/DragonPy/releases/tag/v0.1.0|v0.1.0]] see also: [[http://archive.worldofdragon.org/phpBB3/viewtopic.php?f=5&t=4308&p=11719#p11719|Forum post 11719]].
+* 27.08.2014 - Run CoCo with Extended Color Basic v1.1, bugfix transfer BASIC Listing with [[https://github.com/jedie/DragonPy/compare/8fe24e5...697d39e|8fe24e5...697d39e]] see: [[http://archive.worldofdragon.org/phpBB3/viewtopic.php?f=5&t=4308&start=90#p11696|Forum post 11696]].
+* 20.08.2014 - rudimenary BASIC IDE works with [[https://github.com/jedie/DragonPy/compare/7e0f16630...ce12148|7e0f16630...ce12148]], see also: [[http://archive.worldofdragon.org/phpBB3/viewtopic.php?f=8&t=4439#p11645|Forum post 11645]].
+* 05.08.2014 - Start to support CoCo, too with [[https://github.com/jedie/DragonPy/commit/0df724b3ee9d87088b524c3623040a41e9772eb4|0df724b]], see also: [[http://archive.worldofdragon.org/phpBB3/viewtopic.php?f=5&t=4308&start=80#p11573|Forum post 11573]].
+* 04.08.2014 - Use the origin Pixel-Font with Tkinter GUI, see: [[http://archive.worldofdragon.org/phpBB3/viewtopic.php?f=5&t=4909|Forum post 4909]] and [[http://archive.worldofdragon.org/phpBB3/viewtopic.php?f=5&t=4308&start=80#p11570|Forum post 11570]].
+* 27.07.2014 - Copyrigth info from Dragon 64 ROM is alive with [[https://github.com/jedie/DragonPy/commit/543275b1b90824b64b67dcd003cc5ab54296fc15|543275b]], see: [[http://archive.worldofdragon.org/phpBB3/viewtopic.php?f=5&t=4308&start=80#p11524|Forum post 11524]].
+* 29.06.2014 - First "HELLO WORLD" works, see: [[http://archive.worldofdragon.org/phpBB3/viewtopic.php?f=5&t=4308&start=70#p11283|Forum post 11283]].
+* 27.10.2013 - "sbc09" ROM works wuite well almist, see: [[http://archive.worldofdragon.org/phpBB3/viewtopic.php?f=5&t=4308&start=60#p9752|Forum post 9752]].
+* 16.10.2013 - See copyright info from "Simple6809" ROM with [[https://github.com/jedie/DragonPy/tree/25a97b66d8567ba7c3a5b646e4a807b816a0e376|25a97b6]] see also: [[http://archive.worldofdragon.org/phpBB3/viewtopic.php?f=5&t=4308&start=50#p9654|Forum post 9654]].
+* 10.09.2013 - Start to implement the 6809 CPU with [[https://github.com/jedie/DragonPy/commit/591d2ed2b6f1a5f913c14e56e1e37f5870510b0d|591d2ed]]
+* 28.08.2013 - Fork "Apple ][ Emulator" written in Python: https://github.com/jtauber/applepy to https://github.com/jedie/DragonPy
 
 == Links:
 
