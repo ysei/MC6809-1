@@ -200,7 +200,8 @@ class CPU(object):
         ]
 
 #         log.debug("Add opcode functions:")
-        self.opcode_dict = OpCollection(self).get_opcode_dict()
+        self.opcodes = OpCollection(self)
+        self.opcode_dict = self.opcodes.opcode_dict
 
 #         log.debug("illegal ops: %s" % ",".join(["$%x" % c for c in ILLEGAL_OPS]))
         # add illegal instruction
@@ -288,18 +289,55 @@ class CPU(object):
     ####
 
     def get_and_call_next_op(self):
-        opcode = self.read_pc_byte()
-        cycles, instr_func = self.opcode_dict[opcode]
-        instr_func(opcode)
-        self.cycles += cycles
+        #opcode = self.read_pc_byte()
+        #cycles, instr_func = self.opcode_dict[opcode]
+        #instr_func(opcode)
+        #self.cycles += cycles
+        #print(self.opcodes.opcode_dict2[opcode])
+        self.call_instruction_func(self.read_pc_byte())
 
     def quit(self):
         log.critical("CPU quit() called.")
         self.running = False
 
     def call_instruction_func(self, opcode):
-        cycles, instr_func = self.opcode_dict[opcode]
-        instr_func(opcode)
+        #cycles, instr_func = self.opcode_dict[opcode]
+        #instr_func(opcode)
+        #self.cycles += cycles
+
+        cycles, tocall = self.opcodes.opcode_dict2[opcode]
+
+        instr = tocall[0]
+        reg = tocall[1]
+        pre = tocall[2]
+        ppre = tocall[3]
+        post = tocall[4]
+
+        if ppre:
+            post(*instr(opcode, *ppre()))
+        else:
+            if post:
+                if reg:
+                    if pre:
+                        post(*instr(opcode, pre(), reg))
+                    else:
+                        post(*instr(opcode, reg))
+                else:
+                    if pre:
+                        post(*instr(opcode, pre()))
+                    else:
+                        post(*instr(opcode))
+            else:
+                if reg:
+                    if pre:
+                        instr(opcode, pre(), reg)
+                    else:
+                        instr(opcode, reg)
+                else:
+                    if pre:
+                        instr(opcode, pre())
+                    else:
+                        instr(opcode)
         self.cycles += cycles
 
 

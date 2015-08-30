@@ -14,15 +14,17 @@ import inspect
 
 from MC6809.components.MC6809data.MC6809_data_utils import MC6809OP_DATA_DICT
 from MC6809.components.cpu_utils.Instruction_generator import func_name_from_op_code
-from MC6809.components.cpu_utils.instruction_call import PrepagedInstructions
+#from MC6809.components.cpu_utils.instruction_call import PrepagedInstructions
 from MC6809.components.cpu6809_trace import InstructionTrace
-
+from MC6809.components.cpu_utils.instruction_call_new import INSTRUCTION_TABLE
 
 class OpCollection(object):
     def __init__(self, cpu):
         self.cpu = cpu
         self.opcode_dict = {}
+        self.opcode_dict2 = {}
         self.collect_ops()
+        self.table = []
 
     def get_opcode_dict(self):
         return self.opcode_dict
@@ -57,15 +59,43 @@ class OpCollection(object):
 
             func_name = func_name_from_op_code(op_code)
 
-            if self.cpu.cfg.trace:
-                InstructionClass = InstructionTrace
-            else:
-                InstructionClass = PrepagedInstructions
+            # if self.cpu.cfg.trace:
+            #     InstructionClass = InstructionTrace
+            # else:
+            #     InstructionClass = PrepagedInstructions
+            #
+            # instrution_class = InstructionClass(self.cpu, instr_func)
+            # func = getattr(instrution_class, func_name)
+            # #print(func_name, op_code)
+            #
+            # self.opcode_dict[op_code] = (op_code_data["cycles"], func)
 
-            instrution_class = InstructionClass(self.cpu, instr_func)
-            func = getattr(instrution_class, func_name)
 
-            self.opcode_dict[op_code] = (op_code_data["cycles"], func)
+
+            dscr = INSTRUCTION_TABLE.get(func_name)
+            #print(dscr)
+            if dscr is None:
+                raise Exception('instruction not found')
+
+            # [inst, reg, pre, ppre, post]
+            tocall = [instr_func, None, None, None, None]
+
+            pre = dscr[1].get('ea') or dscr[1].get('m')
+            if pre:
+                tocall[2] = getattr(self.cpu, pre)
+            reg = dscr[1].get('register')
+            if reg:
+                tocall[1] = getattr(self.cpu, reg)
+
+            if len(dscr) == 3:
+                tocall[4] = getattr(self.cpu.memory, dscr[2])
+                if dscr[0]:
+                    # action + instruction + write
+                    tocall[3] = getattr(self.cpu, dscr[0])
+
+            self.opcode_dict2[op_code] = (op_code_data["cycles"], tocall)
+
+
 
 
 if __name__ == "__main__":
