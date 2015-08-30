@@ -1,4 +1,7 @@
-# instr(opcode, **INSTRUCTION_TABLE[opcode])
+# table with instruction blueprints
+#
+# instruction name:   ['pre-run cpu method', {instruction kwargs}, 'post-run memory method']
+
 INSTRUCTION_TABLE = {
 
     # single instructions

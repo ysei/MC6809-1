@@ -22,7 +22,6 @@ class OpCollection(object):
     def __init__(self, cpu):
         self.cpu = cpu
         self.opcode_dict = {}
-        self.opcode_dict2 = {}
         self.collect_ops()
         self.table = []
 
@@ -56,44 +55,41 @@ class OpCollection(object):
             )
 
             op_code_data = MC6809OP_DATA_DICT[op_code]
-
             func_name = func_name_from_op_code(op_code)
 
-            # if self.cpu.cfg.trace:
-            #     InstructionClass = InstructionTrace
-            # else:
-            #     InstructionClass = PrepagedInstructions
+            # build instruction call data from table blueprint
+            #   [
+            #       instruction,
+            #       register (instruction arg),
+            #       pre (pre call cpu method as instruction arg),
+            #       ppre (pre run cpu method),
+            #       post (post run memory method)
+            #   ]
             #
-            # instrution_class = InstructionClass(self.cpu, instr_func)
-            # func = getattr(instrution_class, func_name)
-            # #print(func_name, op_code)
-            #
-            # self.opcode_dict[op_code] = (op_code_data["cycles"], func)
+            # basically replaces attribute names from table with real symbols
+            # and reorders all into a list for faster index access in cpu loop
 
+            inst_data = [instr_func, None, None, None, None]
+            blueprint = INSTRUCTION_TABLE.get(func_name)
 
-
-            dscr = INSTRUCTION_TABLE.get(func_name)
-            #print(dscr)
-            if dscr is None:
-                raise Exception('instruction not found')
-
-            # [inst, reg, pre, ppre, post]
-            tocall = [instr_func, None, None, None, None]
-
-            pre = dscr[1].get('ea') or dscr[1].get('m')
+            # instruction arguments
+            # to be called
+            pre = blueprint[1].get('ea') or blueprint[1].get('m')
             if pre:
-                tocall[2] = getattr(self.cpu, pre)
-            reg = dscr[1].get('register')
+                inst_data[2] = getattr(self.cpu, pre)
+            # register
+            reg = blueprint[1].get('register')
             if reg:
-                tocall[1] = getattr(self.cpu, reg)
+                inst_data[1] = getattr(self.cpu, reg)
 
-            if len(dscr) == 3:
-                tocall[4] = getattr(self.cpu.memory, dscr[2])
-                if dscr[0]:
-                    # action + instruction + write
-                    tocall[3] = getattr(self.cpu, dscr[0])
+            # instruction + post
+            if len(blueprint) == 3:
+                inst_data[4] = getattr(self.cpu.memory, blueprint[2])
+                if blueprint[0]:
+                    # ppre
+                    inst_data[3] = getattr(self.cpu, blueprint[0])
 
-            self.opcode_dict2[op_code] = (op_code_data["cycles"], tocall)
+            self.opcode_dict[op_code] = (op_code_data["cycles"], inst_data)
 
 
 
