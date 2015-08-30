@@ -288,7 +288,30 @@ class CPU(object):
     ####
 
     def get_and_call_next_op(self):
-        self.call_instruction_func(self.read_pc_byte())
+        #self.call_instruction_func(self.read_pc_byte())
+        opcode = self.read_pc_byte()
+        cycles, inst_data = self.opcode_dict[opcode]
+        reg = inst_data[1]
+        pre = inst_data[2]
+        ppre = inst_data[3]
+        post = inst_data[4]
+
+        if ppre:
+            post(*inst_data[0](opcode, *ppre()))
+        else:
+            if reg:
+                if pre:
+                    res = inst_data[0](opcode, pre(), reg)
+                else:
+                    res = inst_data[0](opcode, reg)
+            else:
+                if pre:
+                    res = inst_data[0](opcode, pre())
+                else:
+                    res = inst_data[0](opcode)
+            if post:
+                post(*res)
+        self.cycles += cycles
 
     def quit(self):
         log.critical("CPU quit() called.")
