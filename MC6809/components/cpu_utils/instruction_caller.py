@@ -18,12 +18,13 @@ from MC6809.components.cpu_utils.Instruction_generator import func_name_from_op_
 from MC6809.components.cpu6809_trace import InstructionTrace
 from MC6809.components.cpu_utils.instruction_call_new import INSTRUCTION_TABLE
 
+
 class OpCollection(object):
     def __init__(self, cpu):
         self.cpu = cpu
-        self.opcode_dict = {}
+        #self.opcode_dict = {}
+        self.opcode_dict = [None] * 5000
         self.collect_ops()
-        self.table = []
 
     def get_opcode_dict(self):
         return self.opcode_dict
@@ -49,10 +50,10 @@ class OpCollection(object):
 #             instr_func.__name__, ",".join(["$%x" % c for c in opcodes])
 #         ))
         for op_code in opcodes:
-            assert op_code not in self.opcode_dict, \
-                "Opcode $%x (%s) defined more then one time!" % (
-                    op_code, instr_func.__name__
-            )
+            #assert op_code not in self.opcode_dict, \
+            #    "Opcode $%x (%s) defined more then one time!" % (
+            #        op_code, instr_func.__name__
+            #)
 
             op_code_data = MC6809OP_DATA_DICT[op_code]
             func_name = func_name_from_op_code(op_code)
@@ -63,13 +64,14 @@ class OpCollection(object):
             #       register (instruction arg),
             #       pre (pre call cpu method as instruction arg),
             #       ppre (pre run cpu method),
-            #       post (post run memory method)
+            #       post (post run memory method),
+            #       cycles
             #   ]
             #
             # basically replaces attribute names from table with real symbols
             # and reorders all into a list for faster index access in cpu loop
 
-            inst_data = [instr_func, None, None, None, None]
+            inst_data = [instr_func, None, None, None, None, op_code_data["cycles"]]
             blueprint = INSTRUCTION_TABLE.get(func_name)
 
             # instruction arguments
@@ -89,7 +91,7 @@ class OpCollection(object):
                     # ppre
                     inst_data[3] = getattr(self.cpu, blueprint[0])
 
-            self.opcode_dict[op_code] = (op_code_data["cycles"], inst_data)
+            self.opcode_dict[op_code] = inst_data
 
 
 

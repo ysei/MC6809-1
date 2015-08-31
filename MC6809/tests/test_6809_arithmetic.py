@@ -542,7 +542,7 @@ loop:
 #            a, r, self.cpu.cc.get_info
 #        )
         self.assertEqualHex(r, 0x80 - 0x40 - 0x00)
-        self.assertEqual(self.cpu.cc.get_info, "......V.")
+        self.assertEqual(self.cpu.cc.get_cc_info, "......V.")
 
     def test_SBCA_immediate_02(self):
         a = 0x40
@@ -557,7 +557,7 @@ loop:
 #        )
         self.assertEqualHex(r, 0x40 - 0x20 - 0x01)
         # half-carry is undefined
-        self.assertEqual(self.cpu.cc.get_info, "EFHI....")
+        self.assertEqual(self.cpu.cc.get_cc_info, "EFHI....")
 
     def test_ORCC(self):
         a_areas = list(range(0, 3)) + ["..."] + list(range(0x7e, 0x83)) + ["..."] + list(range(0xfd, 0x100))

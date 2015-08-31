@@ -71,6 +71,7 @@ class Memory(object):
 
         # array consumes also less RAM than lists and it's a little bit faster:
         #self._mem = array.array("B", [0x00] * self.INTERNAL_SIZE) # unsigned char
+        #self._mem = bytearray([0]*self.INTERNAL_SIZE)
         self._mem = [0] * self.INTERNAL_SIZE
 
         if cfg and cfg.rom_cfg:
