@@ -125,7 +125,7 @@ loop:
     def test_ASR_inherent(self):
         """
         Jedes Bit der Speicherzelle bzw. des Akkumulators A/B wird um eine Position nach rechts verschoben.
-        Bit 7 wird auf '0' gesetzt, und Bit 0 wird ins Carry Flag übertragen.
+        Bit 7 wird auf '0' gesetzt, und Bit 0 wird ins Carry Flag ubertragen. ( umlaut u:bertragen )
         """
         for src in xrange(0x100):
             self.cpu.accu_b.set(src)
