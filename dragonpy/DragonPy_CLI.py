@@ -5,22 +5,21 @@
     DragonPy - CLI
     ~~~~~~~~~~~~~~
 
-    :created: 2013 by Jens Diemer - www.jensdiemer.de
-    :copyleft: 2013 by the DragonPy team, see AUTHORS for more details.
+    :created: 2013-2014 by Jens Diemer - www.jensdiemer.de
+    :copyleft: 2013-2014 by the DragonPy team, see AUTHORS for more details.
     :license: GNU GPL v3 or above, see LICENSE for more details.
 """
 
 import atexit
 import sys
+import argparse
 
+from Dragon32.config import Dragon32Cfg
+from dragonpy.Multicomp6809.config import Multicomp6809Cfg
+from dragonpy.Simple6809.config import Simple6809Cfg
 from dragonpy.core.DragonPy import Dragon
 from dragonpy.core.base_cli import Base_CLI
 from dragonpy.core.configs import configs
-from dragonpy.utils.simple_debugger import print_exc_plus
-
-from Dragon32.config import Dragon32Cfg
-from dragonpy.Simple6809.config import Simple6809Cfg
-from dragonpy.Multicomp6809.config import Multicomp6809Cfg
 from dragonpy.sbc09.config import SBC09Cfg
 
 
@@ -55,20 +54,14 @@ class DragonPyCLI(Base_CLI):
         self.parser.add_argument("--cfg",
             choices=self.configs.keys(),
             default=configs.DEFAULT,
-            help="Used configuration"
+            help="Used machine configuration"
         )
         self.parser.add_argument('--display_cycle', action='store_true',
             help="print CPU cycle/sec while running."
         )
 
-        # TODO:
-#         self.parser.add_argument('--trace',
-#             help="Filename for create a trace file."
-#         )
-
-        self.parser.add_argument('--compare_trace',
-            type=int, choices=(0, 1, 2, 3, 4, 5), default=0,
-            help="Compare with XRoar/v09 trace file? (see README)"
+        self.parser.add_argument('--trace', action='store_true',
+            help="Create trace lines."
         )
 
         self.parser.add_argument("--bus_socket_host",
@@ -81,16 +74,10 @@ class DragonPyCLI(Base_CLI):
             help="RAM file to load (default none)"
         )
         self.parser.add_argument("--rom",
-            help="ROM file to use (default %s)" % default_cfg.DEFAULT_ROM
+            help="ROM file to use (default set by machine configuration)"
         )
         self.parser.add_argument("--max", type=int,
             help="If given: Stop CPU after given cycles else: run forever"
-        )
-        self.parser.add_argument("--area_debug_active",
-            help="Debug in PC area: <level>:<start>-<end> - e.g.: --area_debug_active=10:db79-ffff"
-        )
-        self.parser.add_argument("--area_debug_cycles", type=int,
-            help="activate debug after CPU cycles",
         )
 
     def setup_cfg(self):
@@ -103,6 +90,12 @@ class DragonPyCLI(Base_CLI):
         self.cfg.config_name = config_name
 
     def run(self):
+        # TODO:
+        # if self.cfg.use_bus:
+        #     url = "http://%s:%s" % (self.cfg.CPU_CONTROL_ADDR, self.cfg.CPU_CONTROL_PORT)
+        #     webbrowser.open(url)
+
+        print "use cfg:", self.cfg.config_name
         dragon = Dragon(self.cfg)
         dragon.run()
 
@@ -113,11 +106,5 @@ def get_cli():
     return cli
 
 if __name__ == "__main__":
-    try:
-        cli = get_cli()
-        cli.run()
-    except SystemExit:
-        pass
-    except:
-        print_exc_plus()
+    print "ERROR: Use .../DragonPy/DragonPy_CLI.py instead of this file!"
 

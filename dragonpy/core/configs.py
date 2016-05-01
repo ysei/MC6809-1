@@ -88,9 +88,6 @@ class BaseConfig(object):
         # print CPU cycle/sec while running
         self.display_cycle = cmd_args.display_cycle
 
-        # Compare with XRoar/v09 trace file? (see README)
-        self.compare_trace = cmd_args.compare_trace
-
         # socket address for internal bus I/O:
         if cmd_args.bus_socket_host and cmd_args.bus_socket_port:
             self.use_bus = True
@@ -108,6 +105,11 @@ class BaseConfig(object):
         else:
             self.rom = self.DEFAULT_ROM
 
+        if cmd_args.trace:
+            self.trace = True
+        else:
+            self.trace = False
+
         self.verbosity = cmd_args.verbosity
 
         if cmd_args.max:
@@ -115,22 +117,8 @@ class BaseConfig(object):
         else:
             self.max_cpu_cycles = None
 
-        if cmd_args.area_debug_active:
-            # FIXME: How do this in a easier way?
-            level, area = cmd_args.area_debug_active.split(":")
-            level = int(level)
-            start, end = area.split("-")
-            start = start.strip()
-            end = end.strip()
-            start = int(start, 16)
-            end = int(end, 16)
-            self.area_debug = (level, start, end)
-        else:
-            self.area_debug = None
-
-        self.area_debug_cycles = cmd_args.area_debug_cycles
-
         self.mem_info = DummyMemInfo()
+        self.memory_callbacks = {}
 
     def _get_initial_Memory(self, size):
         return [0x00] * size
@@ -140,7 +128,6 @@ class BaseConfig(object):
 
     def get_initial_ROM(self):
         return self._get_initial_Memory(self.ROM_SIZE)
-
 
 #     def get_initial_ROM(self):
 #         start=cfg.ROM_START, size=cfg.ROM_SIZE

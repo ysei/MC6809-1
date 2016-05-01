@@ -17,6 +17,7 @@ import sys
 import unittest
 
 from dragonpy.tests.test_base import TextTestRunner2, BaseTestCase
+from dragonpy.utils.logging_utils import setup_logging
 
 
 log = logging.getLogger("DragonPy")
@@ -144,8 +145,13 @@ loop:
 #                 self.cpu.cc.get_info
 #             )
 
+            # Bit seven is held constant.
+            if src_bit_str[0] == "1":
+                excpeted_bits = "1%s" % src_bit_str[:-1]
+            else:
+                excpeted_bits = "0%s" % src_bit_str[:-1]
+
             # test ASRB/LSRB result
-            excpeted_bits = "0%s" % src_bit_str[:-1]
             self.assertEqual(dst_bit_str, excpeted_bits)
 
             # test negative
@@ -243,6 +249,32 @@ class Test6809_Rotate(BaseTestCase):
             # test half carry is uneffected!
             self.assertEqual(self.cpu.cc.H, 1)
 
+    def test_ROL_memory_with_clear_carry(self):
+        for a in xrange(0x100):
+            self.cpu.cc.set(0x00) # clear all CC flags
+            self.cpu.memory.write_byte(0x0050, a)
+            self.cpu_test_run(start=0x0000, end=None, mem=[
+                0x09, 0x50, # ROL #$50
+            ])
+            r = self.cpu.memory.read_byte(0x0050)
+            self.assertROL(a, r, source_carry=0)
+
+            # test half carry is uneffected!
+            self.assertEqual(self.cpu.cc.H, 0)
+
+    def test_ROL_memory_with_set_carry(self):
+        for a in xrange(0x100):
+            self.cpu.cc.set(0xff) # set all CC flags
+            self.cpu.memory.write_byte(0x0050, a)
+            self.cpu_test_run(start=0x0000, end=None, mem=[
+                0x09, 0x50, # ROL #$50
+            ])
+            r = self.cpu.memory.read_byte(0x0050)
+            self.assertROL(a, r, source_carry=1)
+
+            # test half carry is uneffected!
+            self.assertEqual(self.cpu.cc.H, 1)
+
     def assertROR(self, src, dst, source_carry):
             src_bit_str = '{0:08b}'.format(src)
             dst_bit_str = '{0:08b}'.format(dst)
@@ -303,17 +335,44 @@ class Test6809_Rotate(BaseTestCase):
             self.assertEqual(self.cpu.cc.H, 1)
             self.assertEqual(self.cpu.cc.V, 1)
 
+    def test_ROR_memory_with_clear_carry(self):
+        for a in xrange(0x100):
+            self.cpu.cc.set(0x00) # clear all CC flags
+            self.cpu.memory.write_byte(0x0050, a)
+            self.cpu_test_run(start=0x0000, end=None, mem=[
+                0x06, 0x50,# ROR #$50
+            ])
+            r = self.cpu.memory.read_byte(0x0050)
+            self.assertROR(a, r, source_carry=0)
+
+            # test half carry and overflow, they are uneffected!
+            self.assertEqual(self.cpu.cc.H, 0)
+            self.assertEqual(self.cpu.cc.V, 0)
+
+    def test_ROR_memory_with_set_carry(self):
+        for a in xrange(0x100):
+            self.cpu.cc.set(0xff) # set all CC flags
+            self.cpu.memory.write_byte(0x0050, a)
+            self.cpu_test_run(start=0x0000, end=None, mem=[
+                0x06, 0x50,# ROR #$50
+            ])
+            r = self.cpu.memory.read_byte(0x0050)
+            self.assertROR(a, r, source_carry=1)
+
+            # test half carry and overflow, they are uneffected!
+            self.assertEqual(self.cpu.cc.H, 1)
+            self.assertEqual(self.cpu.cc.V, 1)
+
 
 if __name__ == '__main__':
-    log.setLevel(
-#         1
-#        10 # DEBUG
-#         20 # INFO
-#         30 # WARNING
-#         40 # ERROR
-        50 # CRITICAL/FATAL
+    setup_logging(log,
+#         level=1 # hardcore debug ;)
+#        level=10 # DEBUG
+#        level=20 # INFO
+#        level=30 # WARNING
+#         level=40 # ERROR
+        level=50 # CRITICAL/FATAL
     )
-    log.addHandler(logging.StreamHandler())
 
     unittest.main(
         argv=(

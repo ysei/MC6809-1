@@ -12,6 +12,7 @@ import sys
 import unittest
 
 from dragonpy.tests.test_base import TextTestRunner2, BaseTestCase
+from dragonpy.utils.logging_utils import setup_logging
 
 
 log = logging.getLogger("DragonPy")
@@ -303,7 +304,7 @@ loop:
                 self.assertEqual(self.cpu.cc.Z, 0)
 
             # test overflow
-            if r in (0x80, 0x00):
+            if r == 0x80:
                 self.assertEqual(self.cpu.cc.V, 1)
             else:
                 self.assertEqual(self.cpu.cc.V, 0)
@@ -319,7 +320,9 @@ loop:
             ])
             r = self.cpu.accu_b.get()
             excpected_value = excpected_values[i]
-#             print i, r, excpected_value, self.cpu.cc.get_info
+#             print "%5s $%02x > INC > $%02x | CC:%s" % (
+#                 i, i, r, self.cpu.cc.get_info
+#             )
 
             # test INC value from RAM
             self.assertEqual(r, excpected_value)
@@ -338,7 +341,7 @@ loop:
                 self.assertEqual(self.cpu.cc.Z, 0)
 
             # test overflow
-            if r in (0x80, 0x00):
+            if r == 0x80:
                 self.assertEqual(self.cpu.cc.V, 1)
             else:
                 self.assertEqual(self.cpu.cc.V, 0)
@@ -423,19 +426,19 @@ loop:
 
     def test_SUBA_indexed(self):
         self.cpu.memory.load(0x1234, [0x12, 0xff])
-        self.cpu._system_stack_pointer.set(0x1234)
+        self.cpu.system_stack_pointer.set(0x1234)
         self.cpu.accu_a.set(0xff) # start value
         self.cpu_test_run(start=0x1000, end=None, mem=[
             0xa0, 0xe0, # SUBA ,S+
         ])
         self.assertEqualHexByte(self.cpu.accu_a.get(), 0xed) # $ff - $12 = $ed
-        self.assertEqualHexWord(self.cpu.system_stack_pointer, 0x1235)
+        self.assertEqualHexWord(self.cpu.system_stack_pointer.get(), 0x1235)
 
         self.cpu_test_run(start=0x1000, end=None, mem=[
             0xa0, 0xe0, # SUBA ,S+
         ])
         self.assertEqualHexByte(self.cpu.accu_a.get(), 0xed - 0xff & 0xff) # $ee
-        self.assertEqualHexWord(self.cpu.system_stack_pointer, 0x1236)
+        self.assertEqualHexWord(self.cpu.system_stack_pointer.get(), 0x1236)
 
     def test_DEC_extended(self):
         # expected values are: 254 down to 0 than wrap around to 255 and down to 252
@@ -628,24 +631,20 @@ loop:
 
 
 if __name__ == '__main__':
-    log.setLevel(
-#        1
-#        10 # DEBUG
-#         20 # INFO
-#         30 # WARNING
-#         40 # ERROR
-        50 # CRITICAL/FATAL
+    setup_logging(log,
+        level=1 # hardcore debug ;)
+#        level=10 # DEBUG
+#        level=20 # INFO
+#        level=30 # WARNING
+#         level=40 # ERROR
+#        level=50 # CRITICAL/FATAL
     )
-    log.addHandler(logging.StreamHandler())
-
-    # XXX: Disable hacked XRoar trace
-    import cpu6809; cpu6809.trace_file = None
 
     unittest.main(
         argv=(
             sys.argv[0],
 #            "Test6809_Arithmetic",
-#            "Test6809_Arithmetic.test_ABX",
+#             "Test6809_Arithmetic.test_INCB",
         ),
         testRunner=TextTestRunner2,
 #         verbosity=1,

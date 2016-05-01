@@ -4,14 +4,13 @@
     DragonPy - Dragon 32 emulator in Python
     =======================================
 
+    TODO:
+        Maybe "merge" ROM, RAM,
+        so the offset calulation in ROM is not needed.
+
     6809 is Big-Endian
 
-    Links:
-        http://dragondata.worldofdragon.org/Publications/inside-dragon.htm
-        http://www.burgins.com/m6809.html
-        http://koti.mbnet.fi/~atjs/mc6809/
-
-    :copyleft: 2013 by the DragonPy team, see AUTHORS for more details.
+    :copyleft: 2013-2014 by the DragonPy team, see AUTHORS for more details.
     :license: GNU GPL v3 or above, see LICENSE for more details.
 
     Based on:
@@ -26,11 +25,9 @@ import sys
 import socket
 import struct
 
+
 log = logging.getLogger("DragonPy.memory")
-# handler = logging.StreamHandler()
-# handler.level = 5
-# log.handlers = (handler,)
-# log.error("Memory debug on.")
+
 
 class ROM(object):
 
@@ -38,10 +35,13 @@ class ROM(object):
         self.cfg = cfg
         self.start = start
         self.end = start + size
-        self._mem = memory # [0x00] * size
-        assert len(self._mem) == size
-        log.info("init %s Bytes %s (%s - %s)" % (
-            size, self.__class__.__name__, hex(start), hex(self.end)
+
+        self._mem = [None] * start
+        self._mem += memory
+#         self._mem = memory # [0x00] * size
+        # assert len(self._mem) == size, "%i != %i" len(self._mem) == size
+        log.critical("init %s Bytes (real: %s) %s ($%04x - $%04x)" % (
+            size, len(self._mem), self.__class__.__name__, start, self.end
         ))
 
     def load(self, address, data):
@@ -56,7 +56,7 @@ class ROM(object):
     def load_file(self, address, filename):
         with open(filename, "rb") as f:
             for offset, datum in enumerate(f.read()):
-                index = address - self.start + offset
+                index = address + offset
                 try:
                     self._mem[index] = ord(datum)
                 except IndexError:
@@ -69,8 +69,17 @@ class ROM(object):
         ))
 
     def read_byte(self, address):
-        assert self.start <= address <= self.end, "Read %s from %s is not in range %s-%s" % (hex(address), self.__class__.__name__, hex(self.start), hex(self.end))
-        byte = self._mem[address - self.start]
+        try:
+            byte = self._mem[address]
+        except IndexError:
+            raise IndexError(
+                "Read $%04x from %s is not in range $%04x-$%04x (%s size: %i Bytes)" % (
+                    address - self.start,
+                    self.__class__.__name__,
+                    self.start, self.end,
+                    self.__class__.__name__, len(self._mem),
+                )
+            )
 #         log.debug("\tread byte %s: %s" % (hex(address), hex(byte)))
 #         self.cfg.mem_info(address, "read byte")
         return byte
@@ -111,6 +120,19 @@ class Memory(object):
         if cfg and cfg.ram:
             self.ram.load_file(cfg.RAM_START, cfg.ram)
 
+        self._read_callbacks = {}
+        self._write_callbacks = {}
+        for addr_range, functions in cfg.memory_callbacks.items():
+            start_addr, end_addr = addr_range
+            for addr in xrange(start_addr, end_addr):
+                read_func, write_func = functions
+                if read_func:
+                    self._read_callbacks[addr] = read_func
+                if write_func:
+                    self._write_callbacks[addr] = write_func
+        log.debug("memory read callbacks: %s", self._read_callbacks)
+        log.debug("memory write callbacks: %s", self._write_callbacks)
+
     def load(self, address, data):
         if address < self.cfg.RAM_END:
             self.ram.load(address, data)
@@ -123,6 +145,9 @@ class Memory(object):
 
     def read_byte(self, address):
         self.cpu.cycles += 1
+
+        if address in self._read_callbacks:
+            self._read_callbacks[address](self.cpu, address)
 
         if address in self.cfg.bus_addr_areas:
             info = self.cfg.bus_addr_areas[address]
@@ -138,7 +163,7 @@ class Memory(object):
         elif self.cfg.ROM_START <= address <= self.cfg.ROM_END:
             byte = self.rom.read_byte(address)
         else:
-            msg = "reading outside memory area (PC:$%x)" % self.cpu.program_counter
+            msg = "reading outside memory area (PC:$%x)" % self.cpu.program_counter.get()
             self.cfg.mem_info(address, msg)
             msg2 = "%s: $%x" % (msg, address)
             log.warn(msg2)
@@ -166,14 +191,6 @@ class Memory(object):
         return self.read_byte(address + 1) + (self.read_byte(address) << 8)
 
     def write_byte(self, address, value):
-#        log.log(5, "%04x| (%i) write byte $%x at $%x",
-#            self.cpu.last_op_address, self.cpu.cycles, value, address
-#        )
-#         if 32 <= value <= 126:
-#         if 65 <= value <= 90:
-#            log.info("%04x| (%i) write char %r ($%x) at $%x",
-#                self.cpu.last_op_address, self.cpu.cycles, chr(value), value, address
-#            )
         self.cpu.cycles += 1
 
         assert value >= 0, "Write negative byte hex:%00x dez:%i to $%04x" % (value, value, address)
@@ -182,7 +199,6 @@ class Memory(object):
 #             log.error("Write out of range value $%02x to $%04x", value, address)
 #             value = value & 0xff
 #             log.error(" ^^^^ wrap around to $%x", value)
-
 
         if address in self.cfg.bus_addr_areas:
             info = self.cfg.bus_addr_areas[address]
@@ -193,12 +209,15 @@ class Memory(object):
             self.ram.write_byte(address, value)
         else:
             msg = "writing to %x is outside RAM end %x (PC:$%x)" % (
-                address, self.cfg.RAM_END, self.cpu.program_counter
+                address, self.cfg.RAM_END, self.cpu.program_counter.get()
             )
             self.cfg.mem_info(address, msg)
             msg2 = "%s: $%x" % (msg, address)
             log.warn(msg2)
 #             raise RuntimeError(msg2)
+
+        if address in self._write_callbacks:
+            self._write_callbacks[address](self.cpu, address, value)
 
     def write_word(self, address, value):
         if address in self.cfg.bus_addr_areas:
@@ -255,7 +274,7 @@ class Memory(object):
                 return self.cfg.periphery.read_byte(
                     self.cpu.cycles, self.cpu.last_op_address, address
                 )
-        
+
         self._bus_communication(structure, address)
 
         try:
@@ -310,6 +329,25 @@ class Memory(object):
     def bus_write_word(self, address, value):
 #        log.debug(" **** bus write word $%x to $%x" % (value, address))
         return self._bus_write(self.cfg.BUS_STRUCTURE_WORD, address, value)
+
+    def iter_bytes(self, start, end):
+        for addr in xrange(start, end):
+            yield addr, self.read_byte(addr)
+
+    def get_dump(self, start, end):
+        dump_lines = []
+        for addr, value in self.iter_bytes(start, end + 1):
+            msg = "$%04x: $%02x (dez: %i)" % (addr, value, value)
+            msg = "%-25s| %s" % (
+                msg, self.cfg.mem_info.get_shortest(addr)
+            )
+            dump_lines.append(msg)
+        return dump_lines
+
+    def print_dump(self, start, end):
+        print "Memory dump from $%04x to $%04x:" % (start, end)
+        dump_lines = self.get_dump(start, end)
+        print "\n".join(["\t%s" % line for line in dump_lines])
 
 
 def test_run():

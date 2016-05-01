@@ -11,6 +11,10 @@
         James Tauber / http://jtauber.com/ / https://github.com/jtauber/applepy
         originally written 2001, updated 2011
         origin source code licensed under MIT License
+
+    :created: 2013-2014 by Jens Diemer - www.jensdiemer.de
+    :copyleft: 2013-2014 by the DragonPy team, see AUTHORS for more details.
+    :license: GNU GPL v3 or above, see LICENSE for more details.
 """
 
 
@@ -22,6 +26,8 @@ import sys
 import logging
 import os
 
+from dragonpy import cpu6809
+import dragonpy
 from dragonpy.utils.simple_debugger import print_exc_plus
 
 
@@ -41,28 +47,31 @@ class Dragon(object):
         self.cfg = cfg
         self.periphery = cfg.periphery_class(cfg)
 
-        if self.cfg.area_debug_cycles is not None:
-            log.critical("Activate debug after CPU cycle %i (%s)",
-                self.cfg.area_debug_cycles, __file__
-            )
-
         listener = socket.socket()
         listener.bind(("127.0.0.1", 0))
         listener.listen(0)
 
         bus_socket_host, bus_socket_port = listener.getsockname()
+
         cmd_args = [
             sys.executable,
-            "cpu6809.py",
+            "-m", "dragonpy.cpu6809",
+#            os.path.abspath(cpu6809.__file__),
              "--bus_socket_host=%s" % bus_socket_host,
              "--bus_socket_port=%i" % bus_socket_port,
         ]
         cmd_args += sys.argv[1:]
-        print "Startup CPU with: %s" % " ".join(cmd_args)
 
+        root_path = os.path.abspath(
+            os.path.join(os.path.dirname(dragonpy.__file__), "..")
+        )
+
+        print "Startup CPU with: %s in %s" % (" ".join(cmd_args), root_path)
         try:
             # XXX: use multiprocessing module here?
-            self.core = subprocess.Popen(cmd_args)
+            self.core = subprocess.Popen(cmd_args,
+                cwd=root_path
+            )
         except:
             print_exc_plus()
 
@@ -120,15 +129,6 @@ class Dragon(object):
             if should_quit is False:
                 log.critical("Exit DragonPy run loop.")
                 return
-
-            if self.cfg.area_debug_cycles is not None:
-                if cpu_cycles >= self.cfg.area_debug_cycles:
-                    activate_full_debug_logging()
-#                    log.debug("area debug activated after CPU cycle %i" % cpu_cycles)
-                    self.cfg.area_debug_cycles = None
-
-
-
 
 
 if __name__ == "__main__":

@@ -12,6 +12,7 @@
 """
 
 import logging
+from dragonpy.utils.humanize import cc_value2txt
 
 
 log = logging.getLogger("DragonPy")
@@ -100,20 +101,6 @@ def _register_bit(key):
     return property(get_flag, set_flag)
 
 
-def cc_value2txt(status):
-    """
-    >>> cc_value2txt(0x50)
-    '.F.I....'
-    >>> cc_value2txt(0x54)
-    '.F.I.Z..'
-    >>> cc_value2txt(0x59)
-    '.F.IN..C'
-    """
-    return "".join(
-        ["." if status & x == 0 else char for char, x in zip("EFHINZVC", (128, 64, 32, 16, 8, 4, 2, 1))]
-    )
-
-
 class ConditionCodeRegister(object):
     """ CC - 8 bit condition code register bits """
 
@@ -151,6 +138,12 @@ class ConditionCodeRegister(object):
 
     @property
     def get_info(self):
+        """
+        >>> cc=ConditionCodeRegister()
+        >>> cc.set(0xa1)
+        >>> cc.get_info
+        'E.H....C'
+        """
         return cc_value2txt(self.get())
 
     def __str__(self):
@@ -301,7 +294,6 @@ class ConditionCodeRegister(object):
 
     def update_0100(self):
         """ CC bits "HNZVC": -0100 """
-#        log.debug("\tupdate_0100(): set N=0,Z=1,V=0,C=0")
         self.N = 0
         self.Z = 1
         self.V = 0
@@ -312,7 +304,6 @@ class ConditionCodeRegister(object):
         self.set_Z8(r)
         self.V = 0
         self.C = 1
-#        log.debug("\tupdate_NZ01_8(): set V=0,C=1")
 
     def update_NZ_16(self, r):
         self.set_N16(r)
@@ -322,23 +313,16 @@ class ConditionCodeRegister(object):
         self.set_N8(r)
         self.set_Z8(r)
         self.V = 0
-#        log.debug("\tupdate_NZ0_8(): set V=0")
 
     def update_NZ0_16(self, r):
         self.set_N16(r)
         self.set_Z16(r)
         self.V = 0
-#        log.debug("\tupdate_NZ0_16(): set V=0")
 
     def update_NZC_8(self, r):
         self.set_N8(r)
         self.set_Z8(r)
         self.set_C8(r)
-
-    def update_NZV_8(self, a, b, r):
-        self.set_N8(r)
-        self.set_Z8(r)
-        self.set_V8(a, b, r)
 
     def update_NZVC_8(self, a, b, r):
         self.set_N8(r)
@@ -359,12 +343,6 @@ class ConditionCodeRegister(object):
         self.set_V8(a, b, r)
         self.set_C8(r)
 
-    def update_HNZVC_16(self, a, b, r):
-        self.set_H(a, b, r)
-        self.set_N16(r)
-        self.set_Z16(r)
-        self.set_V16(a, b, r)
-        self.set_C16(r)
 
 class ConcatenatedAccumulator(object):
     """

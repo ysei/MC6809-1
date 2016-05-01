@@ -2,15 +2,13 @@
 
 A Open source (GPL v3 or later) emulator for the 30years old homecomputer {{{Dragon 32}}}...
 
-It's in a eary development state and not usable, yet.
+It's in a early development state and not usable, yet.
 A usable Dragon / CoCo emulator is [[http://www.6809.org.uk/dragon/xroar.shtml|XRoar]].
 
 DragonPy will not be a second XRoar written in Python.
 This project is primarily to lean and understand.
 
-The first target is to be able to run sbc09 and the Simple6809 design.
-sbc09 stands for Lennart Benschop 6809 Single Board Computer, read: [[https://github.com/jedie/DragonPy/tree/master/dragonpy/sbc09|/dragonpy/sbc09/README]]
-More info about Simple6809, read: [[https://github.com/jedie/DragonPy/blob/master/dragonpy/Simple6809/README.creole|/dragonpy/Simple6809/README.creole]]
+Currently you can run "single board computer" ROMs like: sbc09, Simple6809 and Multicomp6809.
 
 Future goals are:
 * run Dragon 32 ROMs (maybe in far future: Dragon 64)
@@ -49,10 +47,22 @@ Just request http://localhost:6809 from your browser.
 [[https://travis-ci.org/jedie/DragonPy|Travis CI Status]]: {{https://secure.travis-ci.org/jedie/DragonPy.svg?branch=master|DragonPy build status on travis-ci.org}}
 * https://travis-ci.org/jedie/DragonPy
 
-[[https://coveralls.io/r/jedie/DragonPy|Coveralls Status]]: {{https://img.shields.io/coveralls/jedie/DragonPy.svg|DragonPy status on coveralls.io}}
-* https://coveralls.io/r/jedie/DragonPy
+{# [[https://coveralls.io/r/jedie/DragonPy|Coveralls Status]]: {{https://img.shields.io/coveralls/jedie/DragonPy.svg|DragonPy status on coveralls.io}} #}
+{# * https://coveralls.io/r/jedie/DragonPy #}
 
 === run unittests ===
+
+You should use PyPy to run all tests. It's around 10 time faster.
+
+{{{
+.../path/to/DragonPy$ pypy -m unittest discover
+}}}
+or:
+{{{
+.../path/to/DragonPy$ pypy setup.py test
+}}}
+
+Use normal Python:
 
 {{{
 .../path/to/DragonPy$ python2 -m unittest discover
@@ -61,6 +71,7 @@ or:
 {{{
 .../path/to/DragonPy$ python2 setup.py test
 }}}
+
 
 === create coverage report ===
 
@@ -79,113 +90,24 @@ install [[https://pypi.python.org/pypi/coverage|coverage]] for python 2:
 == CLI
 
 {{{
-DragonPy - Dragon 32 emulator in Python None
--------------------------------------------------------------------------------
-
-usage: DragonPy_CLI.py [-h] [--verbosity {5,7,0,10,20,30,40,50}]
-                       [--logfile {5,7,0,10,20,30,40,50}]
-                       [--log_formatter LOG_FORMATTER]
-                       [--cfg {Dragon32,sbc09,Simple6809}] [--display_cycle]
-                       [--bus_socket_host BUS_SOCKET_HOST]
-                       [--bus_socket_port BUS_SOCKET_PORT] [--ram RAM]
-                       [--rom ROM] [--max MAX]
-                       [--area_debug_active AREA_DEBUG_ACTIVE]
-                       [--area_debug_cycles AREA_DEBUG_CYCLES]
-
-DragonPy - Dragon 32 emulator in Python
-
-optional arguments:
-  -h, --help            show this help message and exit
-  --verbosity {5,7,0,10,20,30,40,50}
-                        verbosity level to stdout (lower == more output!)
-                        (default: 20)
-  --logfile {5,7,0,10,20,30,40,50}
-                        verbosity level to log file (lower == more output!)
-                        (default: 10)
-  --log_formatter LOG_FORMATTER
-                        see: http://docs.python.org/2/library/logging.html
-                        #logrecord-attributes
-  --cfg {Dragon32,sbc09,Simple6809}
-                        Used configuration
-  --display_cycle       print CPU cycle/sec while running.
-  --compare_trace {0,1,2,3}
-                        Compare with XRoar/v09 trace file? (see README)
-  --bus_socket_host BUS_SOCKET_HOST
-                        Host internal socket bus I/O (do not set manually!)
-  --bus_socket_port BUS_SOCKET_PORT
-                        Port for internal socket bus I/O (do not set
-                        manually!)
-  --ram RAM             RAM file to load (default none)
-  --rom ROM             ROM file to use (default d32.rom)
-  --max MAX             If given: Stop CPU after given cycles else: run
-                        forever
-  --area_debug_active AREA_DEBUG_ACTIVE
-                        Debug in PC area: <level>:<start>-<end> - e.g.:
-                        --area_debug_active=10:db79-ffff
-  --area_debug_cycles AREA_DEBUG_CYCLES
-                        activate debug after CPU cycles
+.../path/to/DragonPy$ ./DragonPy_CLI.py --help
 }}}
 
-==== compare trace
-
-For developing we add a way to compare the CPU running with a trace file
-from XRoar or v09.
-
-For this we add the command line option **--compare_trace**
-Set it to:
-
-| **--compare_trace=1** | compare and info if differed
-| **--compare_trace=2** | exit if program counter is differed
-| **--compare_trace=3** | exit if program counter or CC flags are differed
-| **--compare_trace=4** | exit if program counter or CC flags or accu A/B are differed
-| **--compare_trace=5** | exit if program counter or CC flags or A,B,X,Y,U or S are differed
-
-A XRoar trace file must be stored at **~/xroar_trace.txt**
-The v09 trace file here: **~/v09_trace.txt**
 
 == current status
 
-sbc09 works quite well almost:
+sbc09, Simple6809 and Multicomp6809 seems to work.
+
+First GUI used a simple Tkinter window. Looks like this:
+
 {{http://www.jensdiemer.de/static/jensdiemer.de/screenshots/DragonPy_sbc09_01.png}}
 
-Simple6809 and Multicomp6809 ROMs works a little bit.
+{{http://www.jensdiemer.de/static/jensdiemer.de/screenshots/Simple6809_TK_04.PNG}}
 
-First GUI used a simple Tkinter windows.
-Looks like this (outdated):
-{{http://www.jensdiemer.de/static/jensdiemer.de/screenshots/Simple6809_TK_03.PNG}}
-
-Current running output:
-{{{
-6809 EXTENDED BASIC
-(C) 1982 BY MICROSOFT
-
-OK
-PRINT "HELLO WORLD!"
-HELLO WORLD!
-OK
-
-10 FOR I=1 TO 3
-20 PRINT STR$(I)+" DRAGONPY"
-30 NEXT I
-RUN
- .0/////909 DRAGONPY
- .0/////909 DRAGONPY
-OK
-
-A="B"
-?TM ERROR
-OK
-
-LIST
-0./////909 FOR I=1 TO 3
-0./////909 PRINT STR$(I)+" DRAGONPY"
-0.///90909 NEXT I
-OK
-}}}
 
 === performance
 
-The current implementation is not optimised.
+The current implementation is not optimized.
 
 With CPython there is round about 235.000 CPU cycles/sec.
 
@@ -222,9 +144,17 @@ It looks like this:
 
 == TODO:
 
-# Bugfix CPU to run Simple6809 BASIC interpreter
 # implement Dragon 32 periphery
 # use Python multiprocessing module
+
+
+unimplemented OPs:
+
+ * RESET
+ * RTI
+ * SWI / SWI2 / SWI3
+ * SYNC
+
 
 missing unittests after coverage run:
  
@@ -233,14 +163,20 @@ missing unittests after coverage run:
  * DAA
  * MUL
  * SEX
- * BRN
- * BVC
  * BVS
- * LSR memory
- * ROR memory
 
 
 == Links
+
+ * Grant Searle's Multicomp FPGA project:
+ ** Homepage: http://searle.hostei.com/grant/Multicomp/
+ ** own [[https://github.com/jedie/DragonPy/tree/master/dragonpy/Multicomp6809#readme|dragonpy/Multicomp6809/README]]
+ * Lennart Benschop 6809 Single Board Computer:
+ ** Homepage: http://lennartb.home.xs4all.nl/m6809.html
+ ** own [[https://github.com/jedie/DragonPy/tree/master/dragonpy/sbc09#readme|dragonpy/sbc09/README]]
+ * Grant Searle's Simple 6809 design:
+ ** Homepage: http://searle.hostei.com/grant/6809/Simple6809.html
+ ** own [[https://github.com/jedie/DragonPy/tree/master/dragonpy/Simple6809#readme|dragonpy/Simple6809/README]]
 
 Some links:
 
@@ -262,18 +198,6 @@ Dragon 32 resources:
 
  * Forum: http://archive.worldofdragon.org/phpBB3/index.php
  * Wiki: http://archive.worldofdragon.org/index.php?title=Main_Page
-
-other resources:
-
- * Grant Searle's Multicomp FPGA project:
- ** Homepage: http://searle.hostei.com/grant/Multicomp/
- ** own [[https://github.com/jedie/DragonPy/tree/master/dragonpy/Simple6809#readme|dragonpy/Simple6809/README]]
- * Lennart Benschop 6809 Single Board Computer:
- ** Homepage: http://lennartb.home.xs4all.nl/m6809.html
- ** own [[https://github.com/jedie/DragonPy/tree/master/dragonpy/sbc09#readme|dragonpy/sbc09/README]]
- * Grant Searle's Simple 6809 design:
- ** Homepage: http://searle.hostei.com/grant/6809/Simple6809.html
- ** own [[https://github.com/jedie/DragonPy/tree/master/dragonpy/Multicomp6809#readme|dragonpy/Multicomp6809/README]]
 
 
 == Credits
