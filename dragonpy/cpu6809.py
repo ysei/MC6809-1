@@ -790,7 +790,7 @@ class CPU(object):
         CC bits "HNZVC": -aa0a
 
         Operation:
-            ACCA' ← ACCA + CF(MSN):CF(LSN)
+            ACCA' <- ACCA + CF(MSN):CF(LSN)
 
         where CF is a Correction Factor, as follows:
         the CF for each nibble (BCD) digit is determined separately,
