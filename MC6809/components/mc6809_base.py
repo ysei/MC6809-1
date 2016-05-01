@@ -12,7 +12,7 @@
         http://www.burgins.com/m6809.html
         http://koti.mbnet.fi/~atjs/mc6809/
 
-    :copyleft: 2013-2014 by the MC6809 team, see AUTHORS for more details.
+    :copyleft: 2013-2015 by the MC6809 team, see AUTHORS for more details.
     :license: GNU GPL v3 or above, see LICENSE for more details.
 
     Based on:
@@ -22,11 +22,10 @@
 """
 
 from __future__ import absolute_import, division, print_function
-import inspect
 
 import sys
 import time
-import warnings
+from MC6809.components.mc6809_tools import calc_new_count
 
 if sys.version_info[0] == 3:
     # Python 3
@@ -39,11 +38,10 @@ import logging
 
 from MC6809.components.cpu_utils.instruction_caller import opcode
 
-from MC6809.core.cpu_control_server import start_http_control_server
 from MC6809.components.cpu_utils.MC6809_registers import (
     ValueStorage8Bit, ConcatenatedAccumulator,
-    ValueStorage16Bit, ConditionCodeRegister, UndefinedRegister
-)
+    ValueStorage16Bit, UndefinedRegister,
+    convert_differend_width)
 from MC6809.components.cpu_utils.instruction_caller import OpCollection
 from MC6809.utils.bits import is_bit_set, get_bit
 from MC6809.utils.byte_word_values import signed8, signed16, signed5
@@ -76,6 +74,8 @@ class CPUBase(object):
     RESET_VECTOR = 0xfffe
 
     STARTUP_BURST_COUNT = 100
+    min_burst_count = 10 # minimum outer op count per burst
+    max_burst_count = 10000 # maximum outer op count per burst
 
     def __init__(self, memory, cfg):
         self.memory = memory
@@ -87,7 +87,7 @@ class CPUBase(object):
         self.last_op_address = 0 # Store the current run opcode memory address
         self.outer_burst_op_count = self.STARTUP_BURST_COUNT
 
-        start_http_control_server(self, cfg)
+        #start_http_control_server(self, cfg) # TODO: Move into seperate Class
 
         self.index_x = ValueStorage16Bit(REG_X, 0) # X - 16 bit index register
         self.index_y = ValueStorage16Bit(REG_Y, 0) # Y - 16 bit index register
@@ -111,8 +111,7 @@ class CPUBase(object):
         # DP - 8 bit direct page register
         self.direct_page = ValueStorage8Bit(REG_DP, 0)
 
-        # 8 bit condition code register bits: E F H I N Z V C
-        self.cc = ConditionCodeRegister()
+        super(CPUBase, self).__init__()
 
         self.register_str2object = {
             REG_X: self.index_x,
@@ -128,7 +127,7 @@ class CPUBase(object):
             REG_D: self.accu_d,
 
             REG_DP: self.direct_page,
-            REG_CC: self.cc,
+            REG_CC: self.cc_register,
 
             undefined_reg.name: undefined_reg, # for TFR, EXG
         }
@@ -141,24 +140,25 @@ class CPUBase(object):
 #         for opcode in ILLEGAL_OPS:
 #             self.opcode_dict[opcode] = IllegalInstruction(self, opcode)
 
+
     def get_state(self):
         """
         used in unittests
         """
         return {
-            REG_X: self.index_x.get(),
-            REG_Y: self.index_y.get(),
+            REG_X: self.index_x.value,
+            REG_Y: self.index_y.value,
 
-            REG_U: self.user_stack_pointer.get(),
-            REG_S: self.system_stack_pointer.get(),
+            REG_U: self.user_stack_pointer.value,
+            REG_S: self.system_stack_pointer.value,
 
-            REG_PC: self.program_counter.get(),
+            REG_PC: self.program_counter.value,
 
-            REG_A: self.accu_a.get(),
-            REG_B: self.accu_b.get(),
+            REG_A: self.accu_a.value,
+            REG_B: self.accu_b.value,
 
-            REG_DP: self.direct_page.get(),
-            REG_CC: self.cc.get(),
+            REG_DP: self.direct_page.value,
+            REG_CC: self.get_cc_value(),
 
             "cycles": self.cycles,
             "RAM": tuple(self.memory._mem) # copy of array.array() values,
@@ -180,7 +180,7 @@ class CPUBase(object):
         self.accu_b.set(state[REG_B])
 
         self.direct_page.set(state[REG_DP])
-        self.cc.set(state[REG_CC])
+        self.set_cc(state[REG_CC])
 
         self.cycles = state["cycles"]
         self.memory.load(address=0x0000, data=state["RAM"])
@@ -188,7 +188,7 @@ class CPUBase(object):
     ####
 
     def reset(self):
-        log.info("%04x| CPU reset:", self.program_counter.get())
+        log.info("%04x| CPU reset:", self.program_counter.value)
 
         self.last_op_address = 0
 
@@ -196,18 +196,18 @@ class CPUBase(object):
             # first op is:
             # E400: 1AFF  reset  orcc #$FF  ;Disable interrupts.
 #             log.debug("\tset CC register to 0xff")
-#             self.cc.set(0xff)
+#             self.set_cc(0xff)
             log.info("\tset CC register to 0x00")
-            self.cc.set(0x00)
+            self.set_cc(0x00)
         else:
 #             log.info("\tset cc.F=1: FIRQ interrupt masked")
-#             self.cc.F = 1
+#             self.F = 1
 #
 #             log.info("\tset cc.I=1: IRQ interrupt masked")
-#             self.cc.I = 1
+#             self.I = 1
 
             log.info("\tset E - 0x80 - bit 7 - Entire register state stacked")
-            self.cc.E = 1
+            self.E = 1
 
 #         log.debug("\tset PC to $%x" % self.cfg.RESET_VECTOR)
 #         self.program_counter = self.cfg.RESET_VECTOR
@@ -293,66 +293,6 @@ class CPUBase(object):
 
             self.call_sync_callbacks()
 
-    # TODO: Move to __init__
-    max_delay = 0.01 # maximum time.sleep() value per burst run
-    delay = 0 # the current time.sleep() value per burst run
-    def delayed_burst_run(self, target_cycles_per_sec):
-        """ Run CPU not faster than given speedlimit """
-        old_cycles = self.cycles
-        start_time = time.time()
-
-        self.burst_run()
-
-        is_duration = time.time() - start_time
-        new_cycles = self.cycles - old_cycles
-        try:
-            is_cycles_per_sec = new_cycles / is_duration
-        except ZeroDivisionError:
-            pass
-        else:
-            should_burst_duration = is_cycles_per_sec / target_cycles_per_sec
-            target_duration = should_burst_duration * is_duration
-            delay = target_duration - is_duration
-            if delay > 0:
-                if delay > self.max_delay:
-                    self.delay = self.max_delay
-                else:
-                    self.delay = delay
-                time.sleep(self.delay)
-
-        self.call_sync_callbacks()
-
-    # TODO: Move to __init__
-    min_burst_count = 10 # minimum outer op count per burst
-    max_burst_count = 10000 # maximum outer op count per burst
-    def calc_new_count(self, burst_count, current_value, target_value):
-        """
-        >>> calc_new_count(burst_count=100, current_value=30, target_value=30)
-        100
-        >>> calc_new_count(burst_count=100, current_value=40, target_value=20)
-        75
-        >>> calc_new_count(burst_count=100, current_value=20, target_value=40)
-        150
-        """
-        # log.critical(
-        #     "%i op count current: %.4f target: %.4f",
-        #     self.outer_burst_op_count, current_value, target_value
-        # )
-        try:
-            new_burst_count = float(burst_count) / float(current_value) * target_value
-            new_burst_count += 1 # At least we need one loop ;)
-        except ZeroDivisionError:
-            return burst_count * 2
-
-        if new_burst_count > self.max_burst_count:
-            return self.max_burst_count
-
-        burst_count = (burst_count + new_burst_count) / 2
-        if burst_count < self.min_burst_count:
-            return self.min_burst_count
-        else:
-            return int(burst_count)
-
     def run(self, max_run_time=0.1, target_cycles_per_sec=None):
         now = time.time
 
@@ -367,9 +307,12 @@ class CPUBase(object):
             self.burst_run()
 
         # Calculate the outer_burst_count new, to hit max_run_time
-        self.outer_burst_op_count = self.calc_new_count(self.outer_burst_op_count,
-            current_value=now() - start_time - self.delay,
-            target_value=max_run_time,
+        self.outer_burst_op_count = calc_new_count(
+            min_value=self.min_burst_count,
+            value=self.outer_burst_op_count,
+            max_value=self.max_burst_count,
+            trigger=now() - start_time - self.delay,
+            target=max_run_time
         )
 
     def test_run(self, start, end, max_ops=1000000):
@@ -379,10 +322,10 @@ class CPUBase(object):
 
         # https://wiki.python.org/moin/PythonSpeed/PerformanceTips#Avoiding_dots...
         get_and_call_next_op = self.get_and_call_next_op
-        program_counter = self.program_counter.get
+        program_counter = self.program_counter
 
         for __ in range(max_ops):
-            if program_counter() == end:
+            if program_counter.value == end:
                 return
             get_and_call_next_op()
         log.critical("Max ops %i arrived!", max_ops)
@@ -412,27 +355,27 @@ class CPUBase(object):
     @property
     def get_info(self):
         return "cc=%02x a=%02x b=%02x dp=%02x x=%04x y=%04x u=%04x s=%04x" % (
-            self.cc.get(),
-            self.accu_a.get(), self.accu_b.get(),
-            self.direct_page.get(),
-            self.index_x.get(), self.index_y.get(),
-            self.user_stack_pointer.get(), self.system_stack_pointer.get()
+            self.get_cc_value(),
+            self.accu_a.value, self.accu_b.value,
+            self.direct_page.value,
+            self.index_x.value, self.index_y.value,
+            self.user_stack_pointer.value, self.system_stack_pointer.value
         )
 
     ####
 
 
     def read_pc_byte(self):
-        op_addr = self.program_counter.get()
+        op_addr = self.program_counter.value
         m = self.memory.read_byte(op_addr)
-        self.program_counter.increment(1)
+        self.program_counter.value += 1
 #        log.log(5, "read pc byte: $%02x from $%04x", m, op_addr)
         return op_addr, m
 
     def read_pc_word(self):
-        op_addr = self.program_counter.get()
+        op_addr = self.program_counter.value
         m = self.memory.read_word(op_addr)
-        self.program_counter.increment(2)
+        self.program_counter.value += 2
 #        log.log(5, "\tread pc word: $%04x from $%04x", m, op_addr)
         return op_addr, m
 
@@ -463,13 +406,7 @@ class CPUBase(object):
 
         CC bits "HNZVC": -----
         """
-        old = self.index_x.get()
-        b = self.accu_b.get()
-        new = self.index_x.increment(b)
-#        log.debug("%x %02x ABX: X($%x) += B($%x) = $%x" % (
-#            self.program_counter, opcode,
-#            old, b, new
-#        ))
+        self.index_x.increment(self.accu_b.value)
 
     @opcode(# Add memory to accumulator with carry
         0x89, 0x99, 0xa9, 0xb9, # ADCA (immediate, direct, indexed, extended)
@@ -484,15 +421,15 @@ class CPUBase(object):
 
         CC bits "HNZVC": aaaaa
         """
-        a = register.get()
-        r = a + m + self.cc.C
+        a = register.value
+        r = a + m + self.C
         register.set(r)
 #        log.debug("$%x %02x ADC %s: %i + %i + %i = %i (=$%x)" % (
 #            self.program_counter, opcode, register.name,
-#            a, m, self.cc.C, r, r
+#            a, m, self.C, r, r
 #        ))
-        self.cc.clear_HNZVC()
-        self.cc.update_HNZVC_8(a, m, r)
+        self.clear_HNZVC()
+        self.update_HNZVC_8(a, m, r)
 
     @opcode(# Add memory to D accumulator
         0xc3, 0xd3, 0xe3, 0xf3, # ADDD (immediate, direct, indexed, extended)
@@ -506,7 +443,7 @@ class CPUBase(object):
         CC bits "HNZVC": -aaaa
         """
         assert register.WIDTH == 16
-        old = register.get()
+        old = register.value
         r = old + m
         register.set(r)
 #        log.debug("$%x %02x %02x ADD16 %s: $%02x + $%02x = $%02x" % (
@@ -514,8 +451,8 @@ class CPUBase(object):
 #            register.name,
 #            old, m, r
 #        ))
-        self.cc.clear_NZVC()
-        self.cc.update_NZVC_16(old, m, r)
+        self.clear_NZVC()
+        self.update_NZVC_16(old, m, r)
 
     @opcode(# Add memory to accumulator
         0x8b, 0x9b, 0xab, 0xbb, # ADDA (immediate, direct, indexed, extended)
@@ -530,7 +467,7 @@ class CPUBase(object):
         CC bits "HNZVC": aaaaa
         """
         assert register.WIDTH == 8
-        old = register.get()
+        old = register.value
         r = old + m
         register.set(r)
 #         log.debug("$%x %02x %02x ADD8 %s: $%02x + $%02x = $%02x" % (
@@ -538,8 +475,8 @@ class CPUBase(object):
 #             register.name,
 #             old, m, r
 #         ))
-        self.cc.clear_HNZVC()
-        self.cc.update_HNZVC_8(old, m, r)
+        self.clear_HNZVC()
+        self.update_HNZVC_8(old, m, r)
 
     @opcode(0xf, 0x6f, 0x7f) # CLR (direct, indexed, extended)
     def instruction_CLR_memory(self, opcode, ea):
@@ -548,7 +485,7 @@ class CPUBase(object):
         source code forms: CLR
         CC bits "HNZVC": -0100
         """
-        self.cc.update_0100()
+        self.update_0100()
         return ea, 0x00
 
     @opcode(0x4f, 0x5f) # CLRA / CLRB (inherent)
@@ -560,15 +497,15 @@ class CPUBase(object):
         CC bits "HNZVC": -0100
         """
         register.set(0x00)
-        self.cc.update_0100()
+        self.update_0100()
 
     def COM(self, value):
         """
         CC bits "HNZVC": -aa01
         """
         value = ~value # the bits of m inverted
-        self.cc.clear_NZ()
-        self.cc.update_NZ01_8(value)
+        self.clear_NZ()
+        self.update_NZ01_8(value)
         return value
 
     @opcode(# Complement memory location
@@ -594,7 +531,7 @@ class CPUBase(object):
         Replaces the contents of accumulator A or B with its logical complement.
         source code forms: COMA; COMB
         """
-        register.set(self.COM(value=register.get()))
+        register.set(self.COM(value=register.value))
 #        log.debug("$%x COM %s" % (
 #            self.program_counter, register.name,
 #        ))
@@ -639,26 +576,26 @@ class CPUBase(object):
         V    -    Undefined.
         C    -    Set if a carry is generated or if the carry bit was set before the operation; cleared otherwise.
         """
-        a = self.accu_a.get()
+        a = self.accu_a.value
 
         correction_factor = 0
         a_hi = a & 0xf0 # MSN - Most Significant Nibble
         a_lo = a & 0x0f # LSN - Least Significant Nibble
 
-        if a_lo > 0x09 or self.cc.H: # cc & 0x20:
+        if a_lo > 0x09 or self.H: # cc & 0x20:
             correction_factor |= 0x06
 
         if a_hi > 0x80 and a_lo > 0x09:
             correction_factor |= 0x60
 
-        if a_hi > 0x90 or self.cc.C: # cc & 0x01:
+        if a_hi > 0x90 or self.C: # cc & 0x01:
             correction_factor |= 0x60
 
         new_value = correction_factor + a
         self.accu_a.set(new_value)
 
-        self.cc.clear_NZ() # V is undefined
-        self.cc.update_NZC_8(new_value)
+        self.clear_NZ() # V is undefined
+        self.update_NZC_8(new_value)
 
     def DEC(self, a):
         """
@@ -673,10 +610,10 @@ class CPUBase(object):
         CC bits "HNZVC": -aaa-
         """
         r = a - 1
-        self.cc.clear_NZV()
-        self.cc.update_NZ_8(r)
+        self.clear_NZV()
+        self.update_NZ_8(r)
         if r == 0x7f:
-            self.cc.V = 1
+            self.V = 1
         return r
 
     @opcode(0xa, 0x6a, 0x7a) # DEC (direct, indexed, extended)
@@ -693,7 +630,7 @@ class CPUBase(object):
     @opcode(0x4a, 0x5a) # DECA / DECB (inherent)
     def instruction_DEC_register(self, opcode, register):
         """ Decrement accumulator """
-        a = register.get()
+        a = register.value
         r = self.DEC(a)
 #        log.debug("$%x DEC %s value $%x -1 = $%x" % (
 #            self.program_counter,
@@ -703,10 +640,10 @@ class CPUBase(object):
 
     def INC(self, a):
         r = a + 1
-        self.cc.clear_NZV()
-        self.cc.update_NZ_8(r)
+        self.clear_NZV()
+        self.update_NZ_8(r)
         if r == 0x80:
-            self.cc.V = 1
+            self.V = 1
         return r
 
     @opcode(# Increment accumulator
@@ -725,7 +662,7 @@ class CPUBase(object):
 
         CC bits "HNZVC": -aaa-
         """
-        a = register.get()
+        a = register.value
         r = self.INC(a)
         r = register.set(r)
 
@@ -802,8 +739,8 @@ class CPUBase(object):
 #             self.cfg.mem_info.get_shortest(ea)
 #         ))
         register.set(ea)
-        self.cc.Z = 0
-        self.cc.set_Z16(ea)
+        self.Z = 0
+        self.set_Z16(ea)
 
     @opcode(# Unsigned multiply (A * B ? D)
         0x3d, # MUL (inherent)
@@ -821,10 +758,10 @@ class CPUBase(object):
 
         CC bits "HNZVC": --a-a
         """
-        r = self.accu_a.get() * self.accu_b.get()
+        r = self.accu_a.value * self.accu_b.value
         self.accu_d.set(r)
-        self.cc.Z = 1 if r == 0 else 0
-        self.cc.C = 1 if r & 0x80 else 0
+        self.Z = 1 if r == 0 else 0
+        self.C = 1 if r & 0x80 else 0
 
     @opcode(# Negate accumulator
         0x40, # NEGA (inherent)
@@ -842,14 +779,14 @@ class CPUBase(object):
 
         CC bits "HNZVC": uaaaa
         """
-        x = register.get()
+        x = register.value
         r = x * -1 # same as: r = ~x + 1
         register.set(r)
 #        log.debug("$%04x NEG %s $%02x to $%02x" % (
 #            self.program_counter, register.name, x, r,
 #        ))
-        self.cc.clear_NZVC()
-        self.cc.update_NZVC_8(0, x, r)
+        self.clear_NZVC()
+        self.update_NZVC_8(0, x, r)
 
     _wrong_NEG = 0
     @opcode(0x0, 0x60, 0x70) # NEG (direct, indexed, extended)
@@ -867,8 +804,8 @@ class CPUBase(object):
 #        log.debug("$%04x NEG $%02x from %04x to $%02x" % (
 #             self.program_counter, m, ea, r,
 #         ))
-        self.cc.clear_NZVC()
-        self.cc.update_NZVC_8(0, m, r)
+        self.clear_NZVC()
+        self.update_NZVC_8(0, m, r)
         return ea, r & 0xff
 
     @opcode(0x12) # NOP (inherent)
@@ -898,15 +835,15 @@ class CPUBase(object):
 
         CC bits "HNZVC": uaaaa
         """
-        a = register.get()
-        r = a - m - self.cc.C
+        a = register.value
+        r = a - m - self.C
         register.set(r)
 #        log.debug("$%x %02x SBC %s: %i - %i - %i = %i (=$%x)" % (
 #            self.program_counter, opcode, register.name,
-#            a, m, self.cc.C, r, r
+#            a, m, self.C, r, r
 #        ))
-        self.cc.clear_NZVC()
-        self.cc.update_NZVC_8(a, m, r)
+        self.clear_NZVC()
+        self.update_NZVC_8(a, m, r)
 
     @opcode(# Sign Extend B accumulator into A accumulator
         0x1d, # SEX (inherent)
@@ -930,16 +867,16 @@ class CPUBase(object):
         #define SIGNED(b) ((Word)(b&0x80?b|0xff00:b))
         case 0x1D: /* SEX */ tw=SIGNED(ibreg); SETNZ16(tw) SETDREG(tw) break;
         """
-        b = self.accu_b.get()
+        b = self.accu_b.value
         if b & 0x80 == 0:
             self.accu_a.set(0x00)
 
-        d = self.accu_d.get()
+        d = self.accu_d.value
 
 #        log.debug("SEX: b=$%x ; $%x&0x80=$%x ; d=$%x", b, b, (b & 0x80), d)
 
-        self.cc.clear_NZ()
-        self.cc.update_NZ_16(d)
+        self.clear_NZ()
+        self.update_NZ_16(d)
 
 
 
@@ -958,7 +895,7 @@ class CPUBase(object):
 
         CC bits "HNZVC": uaaaa
         """
-        r = register.get()
+        r = register.value
         r_new = r - m
         register.set(r_new)
 #        log.debug("$%x SUB8 %s: $%x - $%x = $%x (dez.: %i - %i = %i)" % (
@@ -966,12 +903,12 @@ class CPUBase(object):
 #            r, m, r_new,
 #            r, m, r_new,
 #        ))
-        self.cc.clear_NZVC()
+        self.clear_NZVC()
         if register.WIDTH == 8:
-            self.cc.update_NZVC_8(r, m, r_new)
+            self.update_NZVC_8(r, m, r_new)
         else:
             assert register.WIDTH == 16
-            self.cc.update_NZVC_16(r, m, r_new)
+            self.update_NZVC_16(r, m, r_new)
 
 
     # ---- Register Changes - FIXME: Better name for this section?!? ----
@@ -1006,25 +943,8 @@ class CPUBase(object):
 
     def _get_register_and_value(self, addr):
         reg = self._get_register_obj(addr)
-        reg_value = reg.get()
+        reg_value = reg.value
         return reg, reg_value
-
-    def _convert_differend_width(self, src_reg, src_value, dst_reg):
-        """
-        e.g.:
-         8bit   $cd TFR into 16bit, results in: $cd00
-        16bit $1234 TFR into  8bit, results in:   $34
-
-        TODO: verify this behaviour on real hardware
-        see: http://archive.worldofdragon.org/phpBB3/viewtopic.php?f=8&t=4886
-        """
-        if src_reg.WIDTH == 8 and dst_reg.WIDTH == 16:
-            # e.g.: $cd -> $ffcd
-            src_value += 0xff00
-        elif src_reg.WIDTH == 16 and dst_reg.WIDTH == 8:
-            # e.g.: $1234 -> $34
-            src_value = src_value | 0xff00
-        return src_value
 
     @opcode(0x1f) # TFR (immediate)
     def instruction_TFR(self, opcode, m):
@@ -1033,9 +953,9 @@ class CPUBase(object):
         CC bits "HNZVC": ccccc
         """
         high, low = divmod(m, 16)
-        src_reg, src_value = self._get_register_and_value(high)
         dst_reg = self._get_register_obj(low)
-        src_value = self._convert_differend_width(src_reg, src_value, dst_reg)
+        src_reg = self._get_register_obj(high)
+        src_value = convert_differend_width(src_reg, dst_reg)
         dst_reg.set(src_value)
 #         log.debug("\tTFR: Set %s to $%x from %s",
 #             dst_reg, src_value, src_reg.name
@@ -1050,11 +970,11 @@ class CPUBase(object):
         CC bits "HNZVC": ccccc
         """
         high, low = divmod(m, 0x10)
-        reg1, reg1_value = self._get_register_and_value(high)
-        reg2, reg2_value = self._get_register_and_value(low)
+        reg1 = self._get_register_obj(high)
+        reg2 = self._get_register_obj(low)
 
-        new_reg1_value = self._convert_differend_width(reg2, reg2_value, reg1)
-        new_reg2_value = self._convert_differend_width(reg1, reg1_value, reg2)
+        new_reg1_value = convert_differend_width(reg2, reg1)
+        new_reg2_value = convert_differend_width(reg1, reg2)
 
         reg1.set(new_reg1_value)
         reg2.set(new_reg2_value)

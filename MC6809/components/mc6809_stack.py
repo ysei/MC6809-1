@@ -1,20 +1,44 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+"""
+    MC6809 - 6809 CPU emulator in Python
+    =======================================
+
+    6809 is Big-Endian
+
+    Links:
+        http://dragondata.worldofdragon.org/Publications/inside-dragon.htm
+        http://www.burgins.com/m6809.html
+        http://koti.mbnet.fi/~atjs/mc6809/
+
+    :copyleft: 2013-2015 by the MC6809 team, see AUTHORS for more details.
+    :license: GNU GPL v3 or above, see LICENSE for more details.
+
+    Based on:
+        * ApplyPy by James Tauber (MIT license)
+        * XRoar emulator by Ciaran Anscomb (GPL license)
+    more info, see README
+"""
+
+from __future__ import absolute_import, division, print_function
+
 
 from MC6809.components.cpu_utils.instruction_caller import opcode
 
-from MC6809.utils.bits import is_bit_set
-from MC6809.utils.byte_word_values import signed8, signed16, signed5
 from MC6809.components.MC6809data.MC6809_op_data import (
-    REG_A, REG_B, REG_CC, REG_D, REG_DP, REG_PC,
-    REG_S, REG_U, REG_X, REG_Y
+    REG_A, REG_B, REG_CC, REG_DP, REG_PC,
+    REG_U, REG_X, REG_Y
 )
 
-class MC6809Stack(object):
+
+class StackMixin(object):
 
     def push_byte(self, stack_pointer, byte):
         """ pushed a byte onto stack """
         # FIXME: self.system_stack_pointer -= 1
         stack_pointer.decrement(1)
-        addr = stack_pointer.get()
+        addr = stack_pointer.value
 
 #        log.info(
 #         log.error(
@@ -26,7 +50,7 @@ class MC6809Stack(object):
 
     def pull_byte(self, stack_pointer):
         """ pulled a byte from stack """
-        addr = stack_pointer.get()
+        addr = stack_pointer.value
         byte = self.memory.read_byte(addr)
 #        log.info(
 #         log.error(
@@ -44,7 +68,7 @@ class MC6809Stack(object):
         # FIXME: self.system_stack_pointer -= 2
         stack_pointer.decrement(2)
 
-        addr = stack_pointer.get()
+        addr = stack_pointer.value
 #        log.info(
 #         log.error(
 #            "%x|\tpush word $%x to %s stack at $%x\t|%s",
@@ -59,7 +83,7 @@ class MC6809Stack(object):
 #         self.push_byte(lo)
 
     def pull_word(self, stack_pointer):
-        addr = stack_pointer.get()
+        addr = stack_pointer.value
         word = self.memory.read_word(addr)
 #        log.info(
 #         log.error(
@@ -95,7 +119,7 @@ class MC6809Stack(object):
 
         def push(register_str, stack_pointer):
             register_obj = self.register_str2object[register_str]
-            data = register_obj.get()
+            data = register_obj.value
 
 #             log.debug("\tpush %s with data $%x", register_obj.name, data)
 

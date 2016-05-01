@@ -1,7 +1,33 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+"""
+    MC6809 - 6809 CPU emulator in Python
+    =======================================
+
+    6809 is Big-Endian
+
+    Links:
+        http://dragondata.worldofdragon.org/Publications/inside-dragon.htm
+        http://www.burgins.com/m6809.html
+        http://koti.mbnet.fi/~atjs/mc6809/
+
+    :copyleft: 2013-2015 by the MC6809 team, see AUTHORS for more details.
+    :license: GNU GPL v3 or above, see LICENSE for more details.
+
+    Based on:
+        * ApplyPy by James Tauber (MIT license)
+        * XRoar emulator by Ciaran Anscomb (GPL license)
+    more info, see README
+"""
+
+from __future__ import absolute_import, division, print_function
+
 
 from MC6809.components.cpu_utils.instruction_caller import opcode
 
-class MC6809OpsLoadStore(object):
+
+class OpsLoadStoreMixin(object):
 
     # ---- Store / Load ----
 
@@ -27,8 +53,8 @@ class MC6809OpsLoadStore(object):
 #            self.cfg.mem_info.get_shortest(m)
 #        ))
         register.set(m)
-        self.cc.clear_NZV()
-        self.cc.update_NZ_16(m)
+        self.clear_NZV()
+        self.update_NZ_16(m)
 
     @opcode(# Load accumulator from memory
         0x86, 0x96, 0xa6, 0xb6, # LDA (immediate, direct, indexed, extended)
@@ -47,8 +73,8 @@ class MC6809OpsLoadStore(object):
 #            register.name, m,
 #        ))
         register.set(m)
-        self.cc.clear_NZV()
-        self.cc.update_NZ_8(m)
+        self.clear_NZV()
+        self.update_NZ_8(m)
 
     @opcode(# Store register to memory
         0xdd, 0xed, 0xfd, # STD (direct, indexed, extended)
@@ -66,14 +92,14 @@ class MC6809OpsLoadStore(object):
 
         CC bits "HNZVC": -aa0-
         """
-        value = register.get()
+        value = register.value
 #        log.debug("$%x ST16 store value $%x from %s at $%x \t| %s" % (
 #             self.program_counter,
 #             value, register.name, ea,
 #             self.cfg.mem_info.get_shortest(ea)
 #         ))
-        self.cc.clear_NZV()
-        self.cc.update_NZ_16(value)
+        self.clear_NZV()
+        self.update_NZ_16(value)
         return ea, value # write word to Memory
 
     @opcode(# Store accumulator to memory
@@ -88,14 +114,14 @@ class MC6809OpsLoadStore(object):
 
         CC bits "HNZVC": -aa0-
         """
-        value = register.get()
+        value = register.value
 #        log.debug("$%x ST8 store value $%x from %s at $%x \t| %s" % (
 #             self.program_counter,
 #             value, register.name, ea,
 #             self.cfg.mem_info.get_shortest(ea)
 #         ))
-        self.cc.clear_NZV()
-        self.cc.update_NZ_8(value)
+        self.clear_NZV()
+        self.update_NZ_8(value)
         return ea, value # write byte to Memory
 
 

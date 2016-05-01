@@ -1,7 +1,33 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+"""
+    MC6809 - 6809 CPU emulator in Python
+    =======================================
+
+    6809 is Big-Endian
+
+    Links:
+        http://dragondata.worldofdragon.org/Publications/inside-dragon.htm
+        http://www.burgins.com/m6809.html
+        http://koti.mbnet.fi/~atjs/mc6809/
+
+    :copyleft: 2013-2015 by the MC6809 team, see AUTHORS for more details.
+    :license: GNU GPL v3 or above, see LICENSE for more details.
+
+    Based on:
+        * ApplyPy by James Tauber (MIT license)
+        * XRoar emulator by Ciaran Anscomb (GPL license)
+    more info, see README
+"""
+
+from __future__ import absolute_import, division, print_function
+
 
 from MC6809.components.cpu_utils.instruction_caller import opcode
 
-class MC6809OpsTest(object):
+
+class OpsTestMixin(object):
 
     # ---- Test Instructions ----
 
@@ -25,15 +51,15 @@ class MC6809OpsTest(object):
 
         CC bits "HNZVC": -aaaa
         """
-        r = register.get()
+        r = register.value
         r_new = r - m
 #        log.warning("$%x CMP16 %s $%x - $%x = $%x" % (
 #             self.program_counter,
 #             register.name,
 #             r, m, r_new,
 #         ))
-        self.cc.clear_NZVC()
-        self.cc.update_NZVC_16(r, m, r_new)
+        self.clear_NZVC()
+        self.update_NZVC_16(r, m, r_new)
 
     @opcode(# Compare memory from accumulator
         0x81, 0x91, 0xa1, 0xb1, # CMPA (immediate, direct, indexed, extended)
@@ -51,15 +77,15 @@ class MC6809OpsTest(object):
 
         CC bits "HNZVC": uaaaa
         """
-        r = register.get()
+        r = register.value
         r_new = r - m
 #         log.warning("$%x CMP8 %s $%x - $%x = $%x" % (
 #             self.program_counter,
 #             register.name,
 #             r, m, r_new,
 #         ))
-        self.cc.clear_NZVC()
-        self.cc.update_NZVC_8(r, m, r_new)
+        self.clear_NZVC()
+        self.update_NZVC_8(r, m, r_new)
 
 
     @opcode(# Bit test memory with accumulator
@@ -77,14 +103,14 @@ class MC6809OpsTest(object):
 
         CC bits "HNZVC": -aa0-
         """
-        x = register.get()
+        x = register.value
         r = m & x
 #        log.debug("$%x BIT update CC with $%x (m:%i & %s:%i)" % (
 #            self.program_counter,
 #            r, m, register.name, x
 #        ))
-        self.cc.clear_NZV()
-        self.cc.update_NZ_8(r)
+        self.clear_NZV()
+        self.update_NZ_8(r)
 
     @opcode(# Test accumulator
         0x4d, # TSTA (inherent)
@@ -105,9 +131,9 @@ class MC6809OpsTest(object):
 
         CC bits "HNZVC": -aa0-
         """
-        x = register.get()
-        self.cc.clear_NZV()
-        self.cc.update_NZ_8(x)
+        x = register.value
+        self.clear_NZV()
+        self.update_NZ_8(x)
 
     @opcode(0xd, 0x6d, 0x7d) # TST (direct, indexed, extended)
     def instruction_TST_memory(self, opcode, m):
@@ -115,6 +141,6 @@ class MC6809OpsTest(object):
 #         log.debug("$%x TST m=$%02x" % (
 #             self.program_counter, m
 #         ))
-        self.cc.clear_NZV()
-        self.cc.update_NZ_8(m)
+        self.clear_NZV()
+        self.update_NZ_8(m)
 

@@ -1,7 +1,33 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+"""
+    MC6809 - 6809 CPU emulator in Python
+    =======================================
+
+    6809 is Big-Endian
+
+    Links:
+        http://dragondata.worldofdragon.org/Publications/inside-dragon.htm
+        http://www.burgins.com/m6809.html
+        http://koti.mbnet.fi/~atjs/mc6809/
+
+    :copyleft: 2013-2015 by the MC6809 team, see AUTHORS for more details.
+    :license: GNU GPL v3 or above, see LICENSE for more details.
+
+    Based on:
+        * ApplyPy by James Tauber (MIT license)
+        * XRoar emulator by Ciaran Anscomb (GPL license)
+    more info, see README
+"""
+
+from __future__ import absolute_import, division, print_function
+
 
 from MC6809.components.cpu_utils.instruction_caller import opcode
 
-class MC6809OpsBranches(object):
+
+class OpsBranchesMixin(object):
 
     # ---- Programm Flow Instructions ----
 
@@ -65,7 +91,7 @@ class MC6809OpsBranches(object):
 #            self.last_op_address,
 #            ea, self.cfg.mem_info.get_shortest(ea)
 #        ))
-        self.push_word(self.system_stack_pointer, self.program_counter.get())
+        self.push_word(self.system_stack_pointer, self.program_counter.value)
         self.program_counter.set(ea)
 
 
@@ -87,7 +113,7 @@ class MC6809OpsBranches(object):
 
         CC bits "HNZVC": -----
         """
-        if self.cc.Z == 1:
+        if self.Z == 1:
 #            log.info("$%x BEQ branch to $%x, because Z==1 \t| %s" % (
 #                self.program_counter, ea, self.cfg.mem_info.get_shortest(ea)
 #            ))
@@ -115,10 +141,10 @@ class MC6809OpsBranches(object):
         CC bits "HNZVC": -----
         """
         # Note these variantes are the same:
-        #    self.cc.N == self.cc.V
-        #    (self.cc.N ^ self.cc.V) == 0
-        #    not operator.xor(self.cc.N, self.cc.V)
-        if self.cc.N == self.cc.V:
+        #    self.N == self.V
+        #    (self.N ^ self.V) == 0
+        #    not operator.xor(self.N, self.V)
+        if self.N == self.V:
 #            log.info("$%x BGE branch to $%x, because N XOR V == 0 \t| %s" % (
 #                self.program_counter, ea, self.cfg.mem_info.get_shortest(ea)
 #            ))
@@ -146,11 +172,11 @@ class MC6809OpsBranches(object):
         CC bits "HNZVC": -----
         """
         # Note these variantes are the same:
-        #    not ((self.cc.N ^ self.cc.V) == 1 or self.cc.Z == 1)
-        #    not ((self.cc.N ^ self.cc.V) | self.cc.Z)
-        #    self.cc.N == self.cc.V and self.cc.Z == 0
+        #    not ((self.N ^ self.V) == 1 or self.Z == 1)
+        #    not ((self.N ^ self.V) | self.Z)
+        #    self.N == self.V and self.Z == 0
         # ;)
-        if not self.cc.Z and self.cc.N == self.cc.V:
+        if not self.Z and self.N == self.V:
 #            log.info("$%x BGT branch to $%x, because (N==V and Z==0) \t| %s" % (
 #                self.program_counter, ea, self.cfg.mem_info.get_shortest(ea)
 #            ))
@@ -178,7 +204,7 @@ class MC6809OpsBranches(object):
 
         CC bits "HNZVC": -----
         """
-        if self.cc.C == 0 and self.cc.Z == 0:
+        if self.C == 0 and self.Z == 0:
 #            log.info("$%x BHI branch to $%x, because C==0 and Z==0 \t| %s" % (
 #                self.program_counter, ea, self.cfg.mem_info.get_shortest(ea)
 #            ))
@@ -205,7 +231,7 @@ class MC6809OpsBranches(object):
 
         CC bits "HNZVC": -----
         """
-        if (self.cc.N ^ self.cc.V) == 1 or self.cc.Z == 1:
+        if (self.N ^ self.V) == 1 or self.Z == 1:
 #            log.info("$%x BLE branch to $%x, because N^V==1 or Z==1 \t| %s" % (
 #                self.program_counter, ea, self.cfg.mem_info.get_shortest(ea)
 #            ))
@@ -232,8 +258,8 @@ class MC6809OpsBranches(object):
 
         CC bits "HNZVC": -----
         """
-#         if (self.cc.C|self.cc.Z) == 0:
-        if self.cc.C == 1 or self.cc.Z == 1:
+#         if (self.C|self.Z) == 0:
+        if self.C == 1 or self.Z == 1:
 #            log.info("$%x BLS branch to $%x, because C|Z==1 \t| %s" % (
 #                self.program_counter, ea, self.cfg.mem_info.get_shortest(ea)
 #            ))
@@ -259,7 +285,7 @@ class MC6809OpsBranches(object):
 
         CC bits "HNZVC": -----
         """
-        if (self.cc.N ^ self.cc.V) == 1: # N xor V
+        if (self.N ^ self.V) == 1: # N xor V
 #            log.info("$%x BLT branch to $%x, because N XOR V == 1 \t| %s" % (
 #                self.program_counter, ea, self.cfg.mem_info.get_shortest(ea)
 #            ))
@@ -286,7 +312,7 @@ class MC6809OpsBranches(object):
 
         CC bits "HNZVC": -----
         """
-        if self.cc.N == 1:
+        if self.N == 1:
 #            log.info("$%x BMI branch to $%x, because N==1 \t| %s" % (
 #                self.program_counter, ea, self.cfg.mem_info.get_shortest(ea)
 #            ))
@@ -311,7 +337,7 @@ class MC6809OpsBranches(object):
 
         CC bits "HNZVC": -----
         """
-        if self.cc.Z == 0:
+        if self.Z == 0:
 #            log.info("$%x BNE branch to $%x, because Z==0 \t| %s" % (
 #                self.program_counter, ea, self.cfg.mem_info.get_shortest(ea)
 #            ))
@@ -339,7 +365,7 @@ class MC6809OpsBranches(object):
 
         CC bits "HNZVC": -----
         """
-        if self.cc.N == 0:
+        if self.N == 0:
 #            log.info("$%x BPL branch to $%x, because N==0 \t| %s" % (
 #                self.program_counter, ea, self.cfg.mem_info.get_shortest(ea)
 #            ))
@@ -396,7 +422,7 @@ class MC6809OpsBranches(object):
 
         CC bits "HNZVC": -----
         """
-        if self.cc.V == 0:
+        if self.V == 0:
 #            log.info("$%x BVC branch to $%x, because V==0 \t| %s" % (
 #                self.program_counter, ea, self.cfg.mem_info.get_shortest(ea)
 #            ))
@@ -421,7 +447,7 @@ class MC6809OpsBranches(object):
 
         CC bits "HNZVC": -----
         """
-        if self.cc.V == 1:
+        if self.V == 1:
 #            log.info("$%x BVS branch to $%x, because V==1 \t| %s" % (
 #                self.program_counter, ea, self.cfg.mem_info.get_shortest(ea)
 #            ))
@@ -440,7 +466,7 @@ class MC6809OpsBranches(object):
         CC bits "HNZVC": -----
         case 0x5: cond = REG_CC & CC_C; break; // BCS, BLO, LBCS, LBLO
         """
-        if self.cc.C == 1:
+        if self.C == 1:
 #            log.info("$%x BLO/BCS/LBLO/LBCS branch to $%x, because C==1 \t| %s" % (
 #                self.program_counter, ea, self.cfg.mem_info.get_shortest(ea)
 #            ))
@@ -459,7 +485,7 @@ class MC6809OpsBranches(object):
         CC bits "HNZVC": -----
         case 0x4: cond = !(REG_CC & CC_C); break; // BCC, BHS, LBCC, LBHS
         """
-        if self.cc.C == 0:
+        if self.C == 0:
 #            log.info("$%x BHS/BCC/LBHS/LBCC branch to $%x, because C==0 \t| %s" % (
 #                self.program_counter, ea, self.cfg.mem_info.get_shortest(ea)
 #            ))

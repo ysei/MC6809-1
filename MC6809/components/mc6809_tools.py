@@ -1,4 +1,28 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+"""
+    MC6809 - 6809 CPU emulator in Python
+    =======================================
+
+    6809 is Big-Endian
+
+    Links:
+        http://dragondata.worldofdragon.org/Publications/inside-dragon.htm
+        http://www.burgins.com/m6809.html
+        http://koti.mbnet.fi/~atjs/mc6809/
+
+    :copyleft: 2013-2015 by the MC6809 team, see AUTHORS for more details.
+    :license: GNU GPL v3 or above, see LICENSE for more details.
+
+    Based on:
+        * ApplyPy by James Tauber (MIT license)
+        * XRoar emulator by Ciaran Anscomb (GPL license)
+    more info, see README
+"""
+
 from __future__ import absolute_import, division, print_function
+
 import inspect
 
 import threading
@@ -48,7 +72,7 @@ class CPUStatusThread(threading.Thread):
             raise
 
 
-class CPUThreadedStatus(object):
+class CPUThreadedStatusMixin(object):
     def __init__(self, *args, **kwargs):
         cpu_status_queue = kwargs.get("cpu_status_queue", None)
         if cpu_status_queue is not None:
@@ -57,7 +81,7 @@ class CPUThreadedStatus(object):
             status_thread.start()
 
 
-class CPUTypeAssert(object):
+class CPUTypeAssertMixin(object):
     """
     assert that all attributes of the CPU class will remain as the same.
 
@@ -71,7 +95,7 @@ class CPUTypeAssert(object):
     """
     __ATTR_DICT = {}
     def __init__(self, *args, **kwargs):
-        super(CPUTypeAssert, self).__init__(*args, **kwargs)
+        super(CPUTypeAssertMixin, self).__init__(*args, **kwargs)
         self.__set_attr_dict()
         warnings.warn(
             "CPU TypeAssert used! (Should be only activated for debugging!)"
@@ -91,3 +115,35 @@ class CPUTypeAssert(object):
                     attr, obj, type(obj)
                 )
         return object.__setattr__(self, attr, value)
+
+
+def calc_new_count(min_value, value, max_value, trigger, target):
+    """
+    change 'value' between 'min_value' and 'max_value'
+    so that 'trigger' will be match 'target'
+    
+    >>> calc_new_count(min_value=0, value=100, max_value=200, trigger=30, target=30)
+    100
+
+    >>> calc_new_count(min_value=0, value=100, max_value=200, trigger=50, target=5)
+    55
+    >>> calc_new_count(min_value=60, value=100, max_value=200, trigger=50, target=5)
+    60
+
+    >>> calc_new_count(min_value=0, value=100, max_value=200, trigger=20, target=40)
+    150
+    >>> calc_new_count(min_value=0, value=100, max_value=125, trigger=20, target=40)
+    125
+    """
+    try:
+        new_value = float(value) / float(trigger) * target
+    except ZeroDivisionError:
+        return value * 2
+
+    if new_value > max_value:
+        return max_value
+
+    new_value = int((value + new_value) / 2)
+    if new_value < min_value:
+        return min_value
+    return new_value

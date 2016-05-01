@@ -1,9 +1,34 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+"""
+    MC6809 - 6809 CPU emulator in Python
+    =======================================
+
+    6809 is Big-Endian
+
+    Links:
+        http://dragondata.worldofdragon.org/Publications/inside-dragon.htm
+        http://www.burgins.com/m6809.html
+        http://koti.mbnet.fi/~atjs/mc6809/
+
+    :copyleft: 2013-2015 by the MC6809 team, see AUTHORS for more details.
+    :license: GNU GPL v3 or above, see LICENSE for more details.
+
+    Based on:
+        * ApplyPy by James Tauber (MIT license)
+        * XRoar emulator by Ciaran Anscomb (GPL license)
+    more info, see README
+"""
+
+from __future__ import absolute_import, division, print_function
+
 
 from MC6809.components.cpu_utils.instruction_caller import opcode
 from MC6809.utils.bits import get_bit
 
 
-class MC6809OpsLogical(object):
+class OpsLogicalMixin(object):
     # ---- Logical Operations ----
 
 
@@ -21,11 +46,11 @@ class MC6809OpsLogical(object):
 
         CC bits "HNZVC": -aa0-
         """
-        a = register.get()
+        a = register.value
         r = a & m
         register.set(r)
-        self.cc.clear_NZV()
-        self.cc.update_NZ_8(r)
+        self.clear_NZV()
+        self.update_NZ_8(r)
 #        log.debug("\tAND %s: %i & %i = %i",
 #            register.name, a, m, r
 #        )
@@ -43,11 +68,11 @@ class MC6809OpsLogical(object):
 
         CC bits "HNZVC": -aa0-
         """
-        a = register.get()
+        a = register.value
         r = a ^ m
         register.set(r)
-        self.cc.clear_NZV()
-        self.cc.update_NZ_8(r)
+        self.clear_NZV()
+        self.update_NZ_8(r)
 #        log.debug("\tEOR %s: %i ^ %i = %i",
 #            register.name, a, m, r
 #        )
@@ -66,11 +91,11 @@ class MC6809OpsLogical(object):
 
         CC bits "HNZVC": -aa0-
         """
-        a = register.get()
+        a = register.value
         r = a | m
         register.set(r)
-        self.cc.clear_NZV()
-        self.cc.update_NZ_8(r)
+        self.clear_NZV()
+        self.update_NZ_8(r)
 #         log.debug("$%04x OR %s: %02x | %02x = %02x",
 #             self.program_counter, register.name, a, m, r
 #         )
@@ -91,13 +116,13 @@ class MC6809OpsLogical(object):
 
         CC bits "HNZVC": ddddd
         """
-        assert register == self.cc
+        assert register == self.cc_register
 
-        old_cc = self.cc.get()
+        old_cc = self.get_cc_value()
         new_cc = old_cc & m
-        self.cc.set(new_cc)
+        self.set_cc(new_cc)
 #        log.debug("\tANDCC: $%x AND $%x = $%x | set CC to %s",
-#             old_cc, m, new_cc, self.cc.get_info
+#             old_cc, m, new_cc, self.get_cc_info()
 #         )
 
     @opcode(# OR condition code register
@@ -114,13 +139,13 @@ class MC6809OpsLogical(object):
 
         CC bits "HNZVC": ddddd
         """
-        assert register == self.cc
+        assert register == self.cc_register
 
-        old_cc = self.cc.get()
+        old_cc = self.get_cc_value()
         new_cc = old_cc | m
-        self.cc.set(new_cc)
+        self.set_cc(new_cc)
 #        log.debug("\tORCC: $%x OR $%x = $%x | set CC to %s",
-#             old_cc, m, new_cc, self.cc.get_info
+#             old_cc, m, new_cc, self.get_cc_info()
 #         )
 
     # ---- Logical shift: LSL, LSR ----
@@ -139,8 +164,8 @@ class MC6809OpsLogical(object):
         CC bits "HNZVC": naaas
         """
         r = a << 1
-        self.cc.clear_NZVC()
-        self.cc.update_NZVC_8(a, a, r)
+        self.clear_NZVC()
+        self.update_NZVC_8(a, a, r)
         return r
 
     @opcode(0x8, 0x68, 0x78) # LSL/ASL (direct, indexed, extended)
@@ -161,7 +186,7 @@ class MC6809OpsLogical(object):
         """
         Logical shift left accumulator / Arithmetic shift of accumulator
         """
-        a = register.get()
+        a = register.value
         r = self.LSL(a)
 #        log.debug("$%x LSL %s value $%x << 1 = $%x" % (
 #            self.program_counter,
@@ -179,9 +204,9 @@ class MC6809OpsLogical(object):
         CC bits "HNZVC": -0a-s
         """
         r = a >> 1
-        self.cc.clear_NZC()
-        self.cc.C = get_bit(a, bit=0) # same as: self.cc.C |= (a & 1)
-        self.cc.set_Z8(r)
+        self.clear_NZC()
+        self.C = get_bit(a, bit=0) # same as: self.C |= (a & 1)
+        self.set_Z8(r)
         return r
 
     @opcode(0x4, 0x64, 0x74) # LSR (direct, indexed, extended)
@@ -198,7 +223,7 @@ class MC6809OpsLogical(object):
     @opcode(0x44, 0x54) # LSRA / LSRB (inherent)
     def instruction_LSR_register(self, opcode, register):
         """ Logical shift right accumulator """
-        a = register.get()
+        a = register.value
         r = self.LSR(a)
 #        log.debug("$%x LSR %s value $%x >> 1 = $%x" % (
 #            self.program_counter,
@@ -218,9 +243,9 @@ class MC6809OpsLogical(object):
         CC bits "HNZVC": uaa-s
         """
         r = (a >> 1) | (a & 0x80)
-        self.cc.clear_NZC()
-        self.cc.C = get_bit(a, bit=0) # same as: self.cc.C |= (a & 1)
-        self.cc.update_NZ_8(r)
+        self.clear_NZC()
+        self.C = get_bit(a, bit=0) # same as: self.C |= (a & 1)
+        self.update_NZ_8(r)
         return r
 
     @opcode(0x7, 0x67, 0x77) # ASR (direct, indexed, extended)
@@ -237,7 +262,7 @@ class MC6809OpsLogical(object):
     @opcode(0x47, 0x57) # ASRA/ASRB (inherent)
     def instruction_ASR_register(self, opcode, register):
         """ Arithmetic shift accumulator right """
-        a = register.get()
+        a = register.value
         r = self.ASR(a)
 #        log.debug("$%x ASR %s value $%x >> 1 | Carry = $%x" % (
 #            self.program_counter,
@@ -258,9 +283,9 @@ class MC6809OpsLogical(object):
 
         CC bits "HNZVC": -aaas
         """
-        r = (a << 1) | self.cc.C
-        self.cc.clear_NZVC()
-        self.cc.update_NZVC_8(a, a, r)
+        r = (a << 1) | self.C
+        self.clear_NZVC()
+        self.update_NZVC_8(a, a, r)
         return r
 
     @opcode(0x9, 0x69, 0x79) # ROL (direct, indexed, extended)
@@ -277,7 +302,7 @@ class MC6809OpsLogical(object):
     @opcode(0x49, 0x59) # ROLA / ROLB (inherent)
     def instruction_ROL_register(self, opcode, register):
         """ Rotate accumulator left """
-        a = register.get()
+        a = register.value
         r = self.ROL(a)
 #        log.debug("$%x ROL %s value $%x << 1 | Carry = $%x" % (
 #            self.program_counter,
@@ -297,10 +322,10 @@ class MC6809OpsLogical(object):
 
         CC bits "HNZVC": -aa-s
         """
-        r = (a >> 1) | (self.cc.C << 7)
-        self.cc.clear_NZ()
-        self.cc.update_NZ_8(r)
-        self.cc.C = get_bit(a, bit=0) # same as: self.cc.C = (a & 1)
+        r = (a >> 1) | (self.C << 7)
+        self.clear_NZ()
+        self.update_NZ_8(r)
+        self.C = get_bit(a, bit=0) # same as: self.C = (a & 1)
         return r
 
     @opcode(0x6, 0x66, 0x76) # ROR (direct, indexed, extended)
@@ -317,7 +342,7 @@ class MC6809OpsLogical(object):
     @opcode(0x46, 0x56) # RORA/RORB (inherent)
     def instruction_ROR_register(self, opcode, register):
         """ Rotate accumulator right """
-        a = register.get()
+        a = register.value
         r = self.ROR(a)
 #        log.debug("$%x ROR %s value $%x >> 1 | Carry = $%x" % (
 #            self.program_counter,

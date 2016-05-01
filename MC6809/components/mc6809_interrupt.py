@@ -1,13 +1,33 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+"""
+    MC6809 - 6809 CPU emulator in Python
+    =======================================
+
+    6809 is Big-Endian
+
+    Links:
+        http://dragondata.worldofdragon.org/Publications/inside-dragon.htm
+        http://www.burgins.com/m6809.html
+        http://koti.mbnet.fi/~atjs/mc6809/
+
+    :copyleft: 2013-2015 by the MC6809 team, see AUTHORS for more details.
+    :license: GNU GPL v3 or above, see LICENSE for more details.
+
+    Based on:
+        * ApplyPy by James Tauber (MIT license)
+        * XRoar emulator by Ciaran Anscomb (GPL license)
+    more info, see README
+"""
+
+from __future__ import absolute_import, division, print_function
+
 
 from MC6809.components.cpu_utils.instruction_caller import opcode
 
-from MC6809.utils.bits import is_bit_set
-from MC6809.utils.byte_word_values import signed8, signed16, signed5
-from MC6809.components.MC6809data.MC6809_op_data import (
-    REG_S, REG_U, REG_X, REG_Y
-)
 
-class MC6809Interrupt(object):
+class InterruptMixin(object):
 
     # ---- Not Implemented, yet. ----
 
@@ -58,20 +78,20 @@ class MC6809Interrupt(object):
 
     irq_enabled = False
     def irq(self):
-        if not self.irq_enabled or self.cc.I == 1:
+        if not self.irq_enabled or self.I == 1:
             # log.critical("$%04x *** IRQ, ignore!\t%s" % (
-            #     self.program_counter.get(), self.cc.get_info
+            #     self.program_counter.value, self.get_cc_info()
             # ))
             return
 
-        if self.cc.E:
+        if self.E:
             self.push_irq_registers()
         else:
             self.push_firq_registers()
 
         ea = self.memory.read_word(self.IRQ_VECTOR)
         # log.critical("$%04x *** IRQ, set PC to $%04x\t%s" % (
-        #     self.program_counter.get(), ea, self.cc.get_info
+        #     self.program_counter.value, ea, self.get_cc_info()
         # ))
         self.program_counter.set(ea)
 
@@ -81,14 +101,14 @@ class MC6809Interrupt(object):
         push PC, U, Y, X, DP, B, A, CC on System stack pointer
         """
         self.cycles += 1
-        self.push_word(self.system_stack_pointer, self.program_counter.get()) # PC
-        self.push_word(self.system_stack_pointer, self.user_stack_pointer.get()) # U
-        self.push_word(self.system_stack_pointer, self.index_y.get()) # Y
-        self.push_word(self.system_stack_pointer, self.index_x.get()) # X
-        self.push_byte(self.system_stack_pointer, self.direct_page.get()) # DP
-        self.push_byte(self.system_stack_pointer, self.accu_b.get()) # B
-        self.push_byte(self.system_stack_pointer, self.accu_a.get()) # A
-        self.push_byte(self.system_stack_pointer, self.cc.get()) # CC
+        self.push_word(self.system_stack_pointer, self.program_counter.value) # PC
+        self.push_word(self.system_stack_pointer, self.user_stack_pointer.value) # U
+        self.push_word(self.system_stack_pointer, self.index_y.value) # Y
+        self.push_word(self.system_stack_pointer, self.index_x.value) # X
+        self.push_byte(self.system_stack_pointer, self.direct_page.value) # DP
+        self.push_byte(self.system_stack_pointer, self.accu_b.value) # B
+        self.push_byte(self.system_stack_pointer, self.accu_a.value) # A
+        self.push_byte(self.system_stack_pointer, self.get_cc_value()) # CC
 
     def push_firq_registers(self):
         """
@@ -96,8 +116,8 @@ class MC6809Interrupt(object):
         push PC and CC on System stack pointer
         """
         self.cycles += 1
-        self.push_word(self.system_stack_pointer, self.program_counter.get()) # PC
-        self.push_byte(self.system_stack_pointer, self.cc.get()) # CC
+        self.push_word(self.system_stack_pointer, self.program_counter.value) # PC
+        self.push_byte(self.system_stack_pointer, self.get_cc_value()) # CC
 
 
     @opcode(# Return from interrupt
@@ -115,8 +135,8 @@ class MC6809Interrupt(object):
         CC bits "HNZVC": -----
         """
         cc = self.pull_byte(self.system_stack_pointer) # CC
-        self.cc.set(cc)
-        if self.cc.E:
+        self.set_cc(cc)
+        if self.E:
             self.accu_a.set(
                 self.pull_byte(self.system_stack_pointer) # A
             )
@@ -139,7 +159,7 @@ class MC6809Interrupt(object):
         self.program_counter.set(
             self.pull_word(self.system_stack_pointer) # PC
         )
-#         log.critical("RTI to $%04x", self.program_counter.get())
+#         log.critical("RTI to $%04x", self.program_counter.value)
 
 
     @opcode(# Software interrupt (absolute indirect)

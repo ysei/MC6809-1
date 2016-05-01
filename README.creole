@@ -57,6 +57,13 @@ unimplemented OPs:
 
 (Some of the points are related to [[https://github.com/jedie/DragonPy|DragonPy Emulator]])
 
+* 19.10.2015 - [[https://github.com/6809/MC6809/compare/v0.4.6...v0.5.0|v0.5.0]]
+** Split CPU with mixin inheritance
+** Optimizing:
+*** remove {{{.get()}}} function calls from registers
+*** move Condition Code Register (CC) into CPU via mixin class
+** Bugfix TFR and EXG by //convert_differend_width()//
+** Run DragonPy unittests on travis CI, too.
 * 24.08.2015 - [[https://github.com/6809/MC6809/compare/v0.4.5...v0.4.6|v0.4.6]]
 ** Add a "max_delay", to fix the "freeze" after a speed limit change
 ** rename some of the "speed limit" variables
