@@ -90,10 +90,11 @@ class BaseConfig(object):
 
         # socket address for internal bus I/O:
         if cmd_args.bus_socket_host and cmd_args.bus_socket_port:
-            self.use_bus = True
-            self.bus_socket_addr = (cmd_args.bus_socket_host, cmd_args.bus_socket_port)
+            self.bus = True
+            self.bus_socket_host = cmd_args.bus_socket_host
+            self.bus_socket_port = cmd_args.bus_socket_port
         else:
-            self.use_bus = False
+            self.bus = None # Will be set in cpu6809.start_CPU()
 
         if cmd_args.ram:
             self.ram = cmd_args.ram
@@ -152,18 +153,10 @@ class BaseConfig(object):
                 print "%20s = %s" % (name, value)
 
 
-
-
-
-
-
-
-
-
 def test_run():
-    import sys, subprocess
+    import os, sys, subprocess
     cmd_args = [sys.executable,
-        "DragonPy_CLI.py",
+        os.path.join("..", "..", "DragonPy_CLI.py"),
 
 #         "--verbosity=5",
         "--verbosity=10", # DEBUG

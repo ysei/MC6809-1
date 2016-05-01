@@ -28,9 +28,10 @@ import select
 import socket
 import sys
 import warnings
+import threading
 
 
-from MC6809data.MC6809_data_raw2 import (
+from dragonpy.MC6809data.MC6809_data_raw2 import (
     OP_DATA, REG_A, REG_B, REG_CC, REG_D , REG_DP, REG_PC,
     REG_S, REG_U, REG_X, REG_Y
 )
@@ -245,24 +246,25 @@ class CPU(object):
 #        ))
         self.call_instruction_func(op_address - 1, paged_opcode)
 
-    def run(self):
-        while not self.quit:
-            timeout = 0
-            if not self.running:
-                timeout = 1
-            # Currently this handler blocks from the moment
-            # a connection is accepted until the response
-            # is sent. TODO: use an async HTTP server that
-            # handles input data asynchronously.
-            # XXX: use multiprocessing ?
-            sockets = [self.control_server]
-            rs, _, _ = select.select(sockets, [], [], timeout)
-            for s in rs:
-                if s is self.control_server:
-                    self.control_server._handle_request_noblock()
-                else:
-                    pass
+    def control_server_thread(self):
+        timeout = 1
 
+        sockets = [self.control_server]
+        rs, _, _ = select.select(sockets, [], [], timeout)
+        for s in rs:
+            if s is self.control_server:
+                self.control_server._handle_request_noblock()
+            else:
+                pass
+
+        if not self.quit:
+            threading.Timer(interval=0.5, function=self.control_server_thread).start()
+
+    def run(self):
+        assert self.control_server is not None
+        self.control_server_thread() # start control server interval thread
+
+        while not self.quit:
             for __ in xrange(self.cfg.BURST_COUNT):
                 if not self.running:
                     break
@@ -609,18 +611,6 @@ class CPU(object):
 #            self.cfg.mem_info.get_shortest(ea)
 #        )
         return ea
-
-    def get_relative(self):
-        ea = self.get_ea_relative()
-        m = self.memory.read_byte(ea)
-#        log.debug("\tget_relative(): ea = $%x m = $%x", ea, m)
-        return ea, m
-
-    def get_relative_word(self):
-        ea = self.get_ea_relative()
-        m = self.memory.read_word(ea)
-#        log.debug("\tget_relative_word(): ea = $%x m = $%x", ea, m)
-        return ea, m
 
     #### Op methods:
 
@@ -2496,6 +2486,29 @@ class TypeAssert(CPU):
 
 
 
+def start_CPU(cfg, use_bus, bus_socket_host, bus_socket_port):
+    log.info(
+        "Connect to internal socket bus I/O %s:%s", bus_socket_host, bus_socket_port
+    )
+
+    if use_bus:
+        bus = socket.socket()
+        bus.connect(
+            (bus_socket_host, bus_socket_port)
+        )
+        assert bus is not None
+        cfg.bus = bus
+
+    cpu = CPU(cfg)
+    cpu.reset()
+    try:
+        cpu.run()
+    except SystemExit:
+        log.critical("CPU has raised system exit, ok.")
+    except:
+        print_exc_plus()
+
+
 def test_run():
     print "test run..."
     import subprocess
@@ -2503,10 +2516,10 @@ def test_run():
         os.path.join("..", "DragonPy_CLI.py"),
 #        "--verbosity=5",
 #         "--verbosity=10", # DEBUG
-#         "--verbosity=20", # INFO
+        "--verbosity=20", # INFO
 #         "--verbosity=30", # WARNING
 #         "--verbosity=40", # ERROR
-        "--verbosity=50", # CRITICAL/FATAL
+#        "--verbosity=50", # CRITICAL/FATAL
 #
 #         '--log_formatter=%(filename)s %(funcName)s %(lineno)d %(message)s',
 #
@@ -2517,7 +2530,9 @@ def test_run():
          "--cfg=Multicomp6809",
 
 #         "--max=15000",
-        "--max=1",
+#        "--max=1",
+
+        "--display_cycle",
     ]
     print "Startup CLI with: %s" % " ".join(cmd_args[1:])
     subprocess.Popen(cmd_args).wait()
@@ -2525,28 +2540,22 @@ def test_run():
 
 
 if __name__ == "__main__":
+    #
+    # TODO: Only needed for windows-multiprocessing-work-a-round:
+    #       start with script with subprocess.Popen()
+    #
+    #    See: dragonpy.core.DragonPy
+    #
     from dragonpy.DragonPy_CLI import get_cli
     cli = get_cli()
 
-    if not cli.cfg.use_bus:
+    if cli.cfg.bus is None:
         print "DragonPy cpu core"
         print "Run DragonPy_CLI.py instead"
         test_run()
         sys.exit(0)
 
-    bus_socket_addr = cli.cfg.bus_socket_addr
+    bus_socket_host = cli.cfg.bus_socket_host
+    bus_socket_port = cli.cfg.bus_socket_port
 
-    print "Connect to internal socket bus I/O %s" % repr(bus_socket_addr)
-    assert isinstance(bus_socket_addr, tuple)
-    bus = socket.socket()
-    bus.connect(bus_socket_addr)
-    assert bus is not None
-    cli.cfg.bus = bus
-
-    cpu = CPU(cli.cfg)
-    cpu.reset()
-    try:
-        cpu.run()
-    except:
-        print_exc_plus()
-
+    start_CPU(cli.cfg, True, bus_socket_host, bus_socket_port)
